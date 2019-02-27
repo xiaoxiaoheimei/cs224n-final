@@ -3,8 +3,9 @@ https://colab.research.google.com/github/tensorflow/tpu/blob/master/tools/colab/
 
 import os
 import sys
+import layers
 
-!test -d pytorch-pretrained-BERT || git clone https://github.com/huggingface/pytorch-pretrained-BERT
+# !test -d pytorch-pretrained-BERT || git clone https://github.com/huggingface/pytorch-pretrained-BERT
 if not 'pytorch-pretrained-BERT' in sys.path:
     sys.path += ['pytorch-pretrained-BERT']
 
@@ -18,5 +19,8 @@ DataPath = cwd + "\\bert\\"
 BERT_MODEL = 'uncased_L-12_H-768_A-12' #@param {type:"string"}
 BERT_PRETRAINED_DIR = DataPath + BERT_MODEL
 print('***** BERT pretrained directory: {} *****'.format(BERT_PRETRAINED_DIR))
-!gsutil ls $BERT_PRETRAINED_DIR
 
+
+class BertEmbedding(nn.Module):
+    def __init__(self, word_vectors, hidden_size, drop_prob=0.):
+        super(BiDAF, self).__init__()
