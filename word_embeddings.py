@@ -22,9 +22,10 @@ print('***** BERT pretrained directory: {} *****'.format(BERT_PRETRAINED_DIR))
 
 
 
-class BertEmbedding(nn.Module):
-    def __init__(self, word_vectors, hidden_size, drop_prob=0.):
-        super(BiDAF, self).__init__()
+class BertEmbedding(Embedding):
+    def __init__(self, word_vectors, hidden_size, drop_prob):
+        super(Embedding, self).__init__()
+        self.embed = nn.Embedding.from_pretrained(word_vectors)
 
 
 
