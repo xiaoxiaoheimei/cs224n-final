@@ -1,32 +1,34 @@
-"""Following code inspired by [BERT FineTuning with Cloud TPU: Sentence and Sentence-Pair Classification Tasks]
-https://colab.research.google.com/github/tensorflow/tpu/blob/master/tools/colab/bert_finetuning_with_cloud_tpus.ipynb#scrollTo=tYkaAlJNfhul"""
+"""Following code inspired by:
+(1) [pytorch-pretrained-BERT]
+https://github.com/huggingface/pytorch-pretrained-BERT#doc
 
-import os
-import sys
-import layers
+"""
 
-# !test -d pytorch-pretrained-BERT || git clone https://github.com/huggingface/pytorch-pretrained-BERT
-if not 'pytorch-pretrained-BERT' in sys.path:
-    sys.path += ['pytorch-pretrained-BERT']
+import torch
+import torch.nn as nn
+from pytorch_pretrained_bert import BertModel
 
-cwd = os.getcwd()
-DataPath = cwd + "\\bert\\"
+class BertEmbedding(nn.Module):
+    def __init__(self):
+        super(BertEmbedding, self).__init__()
+        self.model = BertModel.from_pretrained("bert-base-uncased")
+    
+    def forward(self, tokens_tensor, segments_tensors):
+        # Load pre-trained model (weights)
+        self.model.eval()
 
-# Available pretrained model checkpoints:
-#   uncased_L-12_H-768_A-12: uncased BERT base model
-#   uncased_L-24_H-1024_A-16: uncased BERT large model
-#   cased_L-12_H-768_A-12: cased BERT large model
-BERT_MODEL = 'uncased_L-12_H-768_A-12' #@param {type:"string"}
-BERT_PRETRAINED_DIR = DataPath + BERT_MODEL
-print('***** BERT pretrained directory: {} *****'.format(BERT_PRETRAINED_DIR))
+        # If you have a GPU, put everything on cuda
+        tokens_tensor = tokens_tensor.to('cuda')
+        segments_tensors = segments_tensors.to('cuda')
+        model.to('cuda')
+        
+        # Predict hidden states features for each layer
+        with torch.no_grad():
+            encoded_layers, _ = model(tokens_tensor, segments_tensors)
+        # We have a hidden states for each of the 12 layers in model bert-base-uncased
+        assert len(encoded_layers) == 12
 
-
-
-class BertEmbedding(Embedding):
-    def __init__(self, word_vectors, hidden_size, drop_prob):
-        super(Embedding, self).__init__()
-        self.embed = nn.Embedding.from_pretrained(word_vectors)
-
+        return encoded_layers
 
 
 def convert_examples_to_features(examples, tokenizer, max_seq_length,
