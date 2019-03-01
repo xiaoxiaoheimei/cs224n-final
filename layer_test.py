@@ -6,7 +6,7 @@
 from char_embeddings import CharEmbeddings
 import torch as t
 import util
-from joint_context_layers import CharQAMultualContext
+from joint_context_layers import CharQAMultualContext, ConcatContext
 import pdb
 
 def test_char_embeddings(data_item):
@@ -30,16 +30,30 @@ def test_qa_multual_context(dataeset):
     char_vectors = util.torch_from_json("./data/char_emb.json")
     cc_idx = dataset[:batch_size][1]
     cq_idx = dataset[:batch_size][3]
-    pdb.set_trace()
+    #pdb.set_trace()
     cqaContext = CharQAMultualContext(hidden_size, char_vectors)
     q_ctx = cqaContext(cc_idx, cq_idx)
     assert tuple(q_ctx.size()) == (batch_size, cc_idx.size(1), 8*hidden_size)
     print("Pass the test of building qa multual context!")
 
+def test_concat_context():
+    batch_size = 10
+    ctx_len = 100
+    w_ctx_dim = 300
+    c_ctx_dim = 98
+    reduce_factor = 0.8
+    reducer = ConcatContext(w_ctx_dim, c_ctx_dim, reduce_factor)
+    w_ctx = t.randn(batch_size, ctx_len, w_ctx_dim)
+    c_ctx = t.randn(batch_size, ctx_len, c_ctx_dim)
+    ctx = reducer(w_ctx, c_ctx)
+    assert tuple(ctx.size()) == (batch_size, ctx_len, int((w_ctx_dim + c_ctx_dim)*reduce_factor))
+    print("Pass the test of merging word/character contexts!")
+
 
 def main(dataset):
-    #test_char_embeddings(dataset[0]);
+    test_char_embeddings(dataset[0]);
     test_qa_multual_context(dataset)
+    test_concat_context()
 
 if __name__ == '__main__':
    dataset = util.SQuAD('./data/train.npz', True)
