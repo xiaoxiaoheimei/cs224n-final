@@ -35,7 +35,7 @@ class CharEmbeddings(nn.Module):
     """
     Class that converts input words to their CNN-based embeddings.
     """
-    def __init__(self, embed_size, char_vector):
+    def __init__(self, embed_size, char_vector, drop_prob=0.3):
         """
         Init the Embedding layer for one language
         @param embed_size (int): Embedding size (dimensionality) for the output 
@@ -46,7 +46,7 @@ class CharEmbeddings(nn.Module):
         self.embeddings = nn.Embedding.from_pretrained(char_vector) #initialize the char embeddings from pretrain
         self.cnn = CNN(self.embeddings.embedding_dim, embed_size)
         self.hy = HighwayEncoder(1, embed_size)
-        self.dropout = nn.Dropout(p=0.3)
+        self.dropout = nn.Dropout(p=drop_prob)
 
     def forward(self, input):
         """
