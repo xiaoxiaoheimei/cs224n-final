@@ -1,11 +1,11 @@
 ####################################
 ## File: char_encoder.py           ##
 ## Author: Liu Yang                ##
-## Email: liu.y.yang@stanford.edu  ##
+## Email: liuyeung@stanford.edu    ##
 ####################################
 
 import torch
-from models import HighwayEncoder
+from layers import HighwayEncoder
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -44,7 +44,7 @@ class CharEmbeddings(nn.Module):
         super(CharEmbeddings, self).__init__()
         self.embed_size = embed_size
         self.embeddings = nn.Embedding.from_pretrained(char_vector) #initialize the char embeddings from pretrain
-        self.cnn = CNN(embed_size, embed_size)
+        self.cnn = CNN(self.embeddings.embedding_dim, embed_size)
         self.hy = HighwayEncoder(1, embed_size)
         self.dropout = nn.Dropout(p=0.3)
 
