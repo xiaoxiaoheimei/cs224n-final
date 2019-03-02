@@ -6,7 +6,7 @@
 from char_embeddings import CharEmbeddings
 import torch as t
 import util
-from joint_context_layers import CharQAMultualContext, ConcatContext, AnswerablePredictor
+from joint_context_layers import CharQAMultualContext, ConcatContext, AnswerablePredictor, StartLocationPredictor
 import pdb
 
 def test_char_embeddings(data_item):
@@ -61,16 +61,37 @@ def test_answerable_predictor():
     c_mask = t.ones(batch_size, ctx_len)
     c_mask[:, ctx_len-30:] = 0.
     predictor = AnswerablePredictor(input_dim, lstm_hdim)
-    (h0, c0), logits = predictor(M, G, c_mask)
-    assert tuple(h0.size()) == (batch_size, lstm_hdim)
-    assert tuple(c0.size()) == (batch_size, lstm_hdim)
+    logits, (h0, c0) = predictor(M, G, c_mask)
+    assert tuple(h0.size()) == (2, batch_size, lstm_hdim)
+    assert tuple(c0.size()) == (2, batch_size, lstm_hdim)
     assert tuple(logits.size()) == (batch_size, 2)
     print("Pass the test of answerable predictor layer!")
+
+def test_start_predictor():
+    batch_size = 10
+    M_dim = 20
+    G_dim = 100
+    ctx_len = 150
+    lstm_hdim = 50
+    input_dim = M_dim + G_dim
+    M = t.randn(batch_size, ctx_len, M_dim)
+    G = t.randn(batch_size, ctx_len, G_dim)
+    c_mask = t.ones(batch_size, ctx_len)
+    c_mask[:, ctx_len-30:] = 0.
+    enc_init = (t.randn(2, batch_size, lstm_hdim), t.randn(2, batch_size, lstm_hdim))
+    predictor = StartLocationPredictor(M_dim, G_dim, lstm_hdim, drop_prob=0.1)
+    p_start, (h0, c0) = predictor(M, G, c_mask, enc_init)
+    assert tuple(h0.size()) == (2, batch_size, lstm_hdim)
+    assert tuple(c0.size()) == (2, batch_size, lstm_hdim)
+    assert tuple(p_start.size()) == (batch_size, ctx_len)
+    print("Pass the test of start predictor layer!")
+
 def main(dataset):
     #test_char_embeddings(dataset[0]);
     #test_qa_multual_context(dataset)
     #test_concat_context()
-    test_answerable_predictor()
+    #test_answerable_predictor()
+    test_start_predictor()
 
 if __name__ == '__main__':
    dataset = util.SQuAD('./data/train.npz', True)
