@@ -6,7 +6,7 @@
 from char_embeddings import CharEmbeddings
 import torch as t
 import util
-from joint_context_layers import CharQAMultualContext, ConcatContext
+from joint_context_layers import CharQAMultualContext, ConcatContext, AnswerablePredictor
 import pdb
 
 def test_char_embeddings(data_item):
@@ -49,11 +49,28 @@ def test_concat_context():
     assert tuple(ctx.size()) == (batch_size, ctx_len, int((w_ctx_dim + c_ctx_dim)*reduce_factor))
     print("Pass the test of merging word/character contexts!")
 
-
+def test_answerable_predictor():
+    batch_size = 10
+    M_dim = 20
+    G_dim = 100
+    ctx_len = 150
+    lstm_hdim = 50
+    input_dim = M_dim + G_dim
+    M = t.randn(batch_size, ctx_len, M_dim)
+    G = t.randn(batch_size, ctx_len, G_dim)
+    c_mask = t.ones(batch_size, ctx_len)
+    c_mask[:, ctx_len-30:] = 0.
+    predictor = AnswerablePredictor(input_dim, lstm_hdim)
+    (h0, c0), logits = predictor(M, G, c_mask)
+    assert tuple(h0.size()) == (batch_size, lstm_hdim)
+    assert tuple(c0.size()) == (batch_size, lstm_hdim)
+    assert tuple(logits.size()) == (batch_size, 2)
+    print("Pass the test of answerable predictor layer!")
 def main(dataset):
-    test_char_embeddings(dataset[0]);
-    test_qa_multual_context(dataset)
-    test_concat_context()
+    #test_char_embeddings(dataset[0]);
+    #test_qa_multual_context(dataset)
+    #test_concat_context()
+    test_answerable_predictor()
 
 if __name__ == '__main__':
    dataset = util.SQuAD('./data/train.npz', True)

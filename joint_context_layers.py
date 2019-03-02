@@ -7,6 +7,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import util
 from char_embeddings import CharEmbeddings
 from layers import RNNEncoder, BiDAFAttention
 
@@ -79,3 +80,47 @@ class ConcatContext(nn.Module):
          cat_ctx = torch.cat((w_ctx, c_ctx), 2) #(batch_size, ctx_len, w_ctx_dim + c_ctx_dim)
          ctx = self.dim_reducer(cat_ctx)
          return ctx
+
+class AnswerablePredictor(nn.Module):
+      '''
+      This layer predict whether the Qestion is answerable
+      '''
+      
+      def __init__(self, input_dim, lstm_hdim):
+          '''
+          Args:
+            @param: input_dim (int): input dimension
+            @param: lstm_hdim (int): the hidden dimension of the LSTM of location predictor
+          '''
+          super(AnswerablePredictor, self).__init__()
+          self.input_dim = input_dim
+          self.lstm_hdim = lstm_hdim
+          self.att_weight = nn.Parameter(torch.zeros(input_dim, 1)) #weight to compute attention with respect to each input vector towards answer prediction
+          self.h_proj = nn.Linear(input_dim, lstm_hdim) #the project layer to obtain initialization of next LSTM hidden state
+          self.c_proj = nn.Linear(input_dim, lstm_hdim) #the project layer to obtain initialization of next LSTM memory state
+          self.logits_proj = nn.Linear(input_dim, 2) #the project layer to obtain (no answer, answerable) logits
+
+          for weight in (self.att_weight, self.h_proj.weight, self.c_proj.weight, self.logits_proj.weight):
+            nn.init.xavier_uniform_(weight)
+
+
+      def forward(self, M, G, ctx_mask):
+          '''
+          Args:
+            @param: M (tensor): the output of the BiDAF model layer (batch_size, ctx_len, m_dim)
+            @param: G (tensor): the output of the context condition on question (batch_size, ctx_len, g_dim)
+            @param: ctx_mask (tensor): the mask of valid word (batch_size, ctx_len)
+          Return:
+            logits (tensor): logits of (0,1), 0 for no answer, 1 for answerable.
+            (h0, c0) (tensor): initialization state of the start-loc LSTM  
+          '''
+          ctx = torch.cat((M, G), 2) #(batch_size, ctx_len, self.input_dim)
+          att = torch.matmul(ctx, self.att_weight).transpose(1,2) #(batch_size, 1, ctx_len)
+          att_prob = util.masked_softmax(att, ctx_mask.unsqueeze(1)) #(batch_size, 1, ctx_len)
+          ctx_summary = torch.bmm(att_prob, ctx).squeeze(1) #(batch_size, self.input_dim)
+          h0 = self.h_proj(ctx_summary) #(batch_size, self.lstm_hdim)
+          c0 = self.c_proj(ctx_summary) #(batch_size, self.lstm_hdim)
+          logits = self.logits_proj(ctx_summary) #(batch_size, self.lstm_hdim)
+          
+          return (h0, c0), logits
+
