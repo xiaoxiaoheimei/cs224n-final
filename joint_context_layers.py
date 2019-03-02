@@ -132,7 +132,7 @@ class AnswerablePredictor(nn.Module):
 
 class StartLocationPredictor(nn.Module):
       '''
-      This layer predict the start position condition on the question is answerable.
+      This layer compute the conditional distribution P(start_loc | Answerable).
       '''
 
       def __init__(self, M_dim, G_dim, lstm_hdim, drop_prob=0):
@@ -168,8 +168,8 @@ class StartLocationPredictor(nn.Module):
             (h0, c0) (tensor): initialization state of the end-loc LSTM
           '''
           lengths = ctx_mask.sum(-1) #(batch_size)
-          M2 = self.rnn(M, lengths, enc_init) #M2: (batch_size, ctx_len, 2*self.lstm_hdim)
-          ctx = torch.cat((G, M2), 2) #(batch_size, ctx_len, self.cat_dim)
+          M1 = self.rnn(M, lengths, enc_init) #M2: (batch_size, ctx_len, 2*self.lstm_hdim)
+          ctx = torch.cat((G, M1), 2) #(batch_size, ctx_len, self.cat_dim)
           logits = self.loc_proj(ctx).squeeze(-1) #(batch_size, ctx_len)
           p_start = util.masked_softmax(logits, ctx_mask) #(batch_size, ctx_len)
           
@@ -187,7 +187,61 @@ class StartLocationPredictor(nn.Module):
           c0 = F.dropout(c0, self.drop_prob, self.training)
          
           return p_start, (h0, c0)
+
+class EndLocationPredictor(nn.Module):
+      '''
+      This layer compute the conditional distribution P(end_loc | Answerable, start_loc)
+      '''
+      
+      def __init__(self, M_dim, G_dim, lstm_hdim, drop_prob=0.):
+          '''
+          Args:
+            @param: input_dim (int): input dimension
+            @param: lstm_hdim (int): the hidden dimension of the LSTM
+          '''
+          super(EndLocationPredictor, self).__init__()
+          self.M_dim = M_dim
+          self.G_dim = G_dim
+          self.lstm_hdim = lstm_hdim
+          self.drop_prob = drop_prob
+          self.cat_dim = G_dim + 2*lstm_hdim
+          self.rnn = RNNEncoder(M_dim, lstm_hdim, 1, drop_prob) 
+          self.h_proj = nn.Linear(2*lstm_hdim, lstm_hdim)
+          self.c_proj = nn.Linear(2*lstm_hdim, lstm_hdim)
+          self.loc_proj = nn.Linear(self.cat_dim, 1)
           
+          for weight in (self.h_proj.weight, self.c_proj.weight):
+              nn.init.xavier_uniform_(weight)
+
+
+      def forward(self, M, G, ctx_mask, enc_init_A, enc_init_start):
+          '''
+          Args:
+            @param: M (tensor): output of the BiDAF model layer (batch_size, ctx_len, M_dim)
+            @param: G (tensor): output of the context condition on question (batch_size, ctx_len, G_dim)
+            @param: ctx_mask (tensor): mask of the valid word (batch_size, ctx_len)
+            @param: enc_init_A (tensor): initialtion state computed by Answerable predictor (2, batch_size, self.lstm_hdim)
+            @param: enc_init_start (tensor): initialtion state computed by start position predictor (2, batch_size, self.lstm_hdim)
+          Rets:
+            p_end (tensor): probability distribution of the end location (batch_size, ctx_len)
+          '''
+          lengths = ctx_mask.sum(-1) #(batch_size)
+          (hA, cA) = enc_init_A
+          (hs, cs) = enc_init_start
+          h0 = self.h_proj(torch.cat((hA, hs), 2)) #(2, batch_size, self.lstm_hdim)
+          c0 = self.h_proj(torch.cat((cA, cs), 2)) #(2, batch_size, self.lstm_hdim)
+          M2 = self.rnn(M, lengths, (h0, c0)) #(batch_size, ctx_len, 2*lstm_hdim)
+          ctx = torch.cat((G, M2), 2) #(batch_size, ctx_len, self.cat_dim)
+          logits = self.loc_proj(ctx).squeeze(-1) #(batch_size, ctx_len)
+          p_end = util.masked_softmax(logits, ctx_mask)#(batch_size, ctx_len)
+
+          return p_end
+          
+          
+
+
+
+
 
 
 
