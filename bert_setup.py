@@ -124,7 +124,7 @@ def is_word_piece(token):
 ###############################################################################
 # Generate bert tokens and the corresponding spans in the raw text            #
 ###############################################################################
-def word_char_bert_tokenize(bert_tokenizer, doc_tokens, doc_token_locs, word_counter, char_counter):
+def word_char_bert_tokenize(bert_tokenizer, doc_tokens, doc_token_locs, word_counter, char_counter, increment=1):
     bert_word_tokens = []
     bert_char_tokens = [] #character tokens
     spans = []
@@ -143,9 +143,9 @@ def word_char_bert_tokenize(bert_tokenizer, doc_tokens, doc_token_locs, word_cou
            bert_char_tokens.append(list(word_piece)) #only add effictive word part, skip the split '##'
         start = end
         bert_word_tokens.append(sub_token)
-        word_counter[sub_token] += 1
+        word_counter[sub_token] += increment
         for c in bert_char_tokens[-1]:
-           char_counter[c] += 1
+           char_counter[c] += increment
  
     return bert_word_tokens, bert_char_tokens, spans
 
@@ -167,7 +167,7 @@ def convert_idx(text, tokens):
     return spans
 
 
-def process_file(filename, data_type, word_counter, char_counter):
+def process_file(filename, bert_tokenizer, data_type, word_counter, char_counter):
     print("Pre-processing {} examples...".format(data_type))
     examples = []
     eval_examples = {}
@@ -178,23 +178,18 @@ def process_file(filename, data_type, word_counter, char_counter):
             for para in article["paragraphs"]:
                 context = para["context"].replace(
                     "''", '" ').replace("``", '" ')
-                context_tokens = word_tokenize(context)
-                context_chars = [list(token) for token in context_tokens]
-                spans = convert_idx(context, context_tokens)
-                for token in context_tokens:
-                    word_counter[token] += len(para["qas"])
-                    for char in token:
-                        char_counter[char] += len(para["qas"])
+                ctx_doc_tokens, ctx_doc_token_locs = separate_words(context)
+                context_tokens, context_chars, spans = word_char_bert_tokenize(bert_tokenizer, ctx_doc_tokens,
+                                                                               ctx_doc_token_locs, word_counter,
+                                                                               char_counter, increment=len(para["qas"]))
                 for qa in para["qas"]:
                     total += 1
                     ques = qa["question"].replace(
                         "''", '" ').replace("``", '" ')
-                    ques_tokens = word_tokenize(ques)
-                    ques_chars = [list(token) for token in ques_tokens]
-                    for token in ques_tokens:
-                        word_counter[token] += 1
-                        for char in token:
-                            char_counter[char] += 1
+                    ques_doc_tokens, ques_doc_token_locs = separate_words(ques)
+                    ques_tokens, ques_chars, _ = word_char_bert_tokenize(bert_tokenizer, ques_doc_tokens, 
+                                                                          ques_doc_token_locs, word_counter,
+                                                                          char_counter, increment=1)
                     y1s, y2s = [], []
                     answer_texts = []
                     for answer in qa["answers"]:
