@@ -80,6 +80,40 @@ def get_setup_args():
                         type=lambda s: s.lower().startswith('t'),
                         default=True,
                         help='Process examples from the test set')
+    parser.add_argument('--train_bert_record_file',
+                        type=str,
+                        default='./data/bert_train.npz',
+                        help='Bert tokenized training set.')
+    parser.add_argument('--dev_bert_record_file',
+                        type=str,
+                        default='./data/bert_dev.npz',
+                        help='Bert tokenized dev set.')
+    parser.add_argument('--test_bert_record_file',
+                        type=str,
+                        default='./data/bert_test.npz',
+                        help='Bert tokenized test set.')
+    parser.add_argument('--train_bert_eval_file',
+                        type=str,
+                        default='./data/train_bert_eval.json')
+    parser.add_argument('--dev_bert_eval_file',
+                        type=str,
+                        default='./data/dev_bert_eval.json')
+    parser.add_argument('--test_bert_eval_file',
+                        type=str,
+                        default='./data/test_bert_eval.json')
+    parser.add_argument('--test_bert_meta_file',
+                        type=str,
+                        default='./data/test_bert_meta.json')
+    parser.add_argument('--char_bert_emb_file',
+                        type=str,
+                        default='./data/char_bert_emb.json')
+    parser.add_argument('--char2idx_bert_file',
+                        type=str,
+                        default='./data/bert_char2idx.json')
+    parser.add_argument('--dev_bert_meta_file',
+                        type=str,
+                        default='./data/dev_bert_meta.json')
+
 
     args = parser.parse_args()
 

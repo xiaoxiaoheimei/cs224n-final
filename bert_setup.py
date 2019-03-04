@@ -413,33 +413,29 @@ def save(filename, obj, message=None):
             json.dump(obj, fh)
 
 
-def pre_process(args):
+def pre_process(args, tokenizer):
     # Process training set and use it to decide on the word/character vocabularies
     word_counter, char_counter = Counter(), Counter()
-    train_examples, train_eval = process_file(args.train_file, "train", word_counter, char_counter)
-    word_emb_mat, word2idx_dict = get_embedding(
-        word_counter, 'word', emb_file=args.glove_file, vec_size=args.glove_dim, num_vectors=args.glove_num_vecs)
+    train_examples, train_eval = process_file(args.train_file, tokenizer, "train", word_counter, char_counter)
     char_emb_mat, char2idx_dict = get_embedding(
         char_counter, 'char', emb_file=None, vec_size=args.char_dim)
 
     # Process dev and test sets
-    dev_examples, dev_eval = process_file(args.dev_file, "dev", word_counter, char_counter)
-    build_features(args, train_examples, "train", args.train_record_file, word2idx_dict, char2idx_dict)
-    dev_meta = build_features(args, dev_examples, "dev", args.dev_record_file, word2idx_dict, char2idx_dict)
+    dev_examples, dev_eval = process_file(args.dev_file, tokenizer, "dev", word_counter, char_counter)
+    build_features(args, train_examples, tokenizer, "train", args.train_bert_record_file, char2idx_dict)
+    dev_meta = build_features(args, dev_examples, tokenizer, "dev", args.dev_bert_record_file, char2idx_dict)
     if args.include_test_examples:
-        test_examples, test_eval = process_file(args.test_file, "test", word_counter, char_counter)
-        save(args.test_eval_file, test_eval, message="test eval")
-        test_meta = build_features(args, test_examples, "test",
-                                   args.test_record_file, word2idx_dict, char2idx_dict, is_test=True)
-        save(args.test_meta_file, test_meta, message="test meta")
+        test_examples, test_eval = process_file(args.test_file, tokenizer, "test", word_counter, char_counter)
+        save(args.test_bert_eval_file, test_eval, message="test eval")
+        test_meta = build_features(args, test_examples, tokenizer, "test",
+                                   args.test_bert_record_file, char2idx_dict, is_test=True)
+        save(args.test_bert_meta_file, test_meta, message="test meta")
 
-    save(args.word_emb_file, word_emb_mat, message="word embedding")
-    save(args.char_emb_file, char_emb_mat, message="char embedding")
-    save(args.train_eval_file, train_eval, message="train eval")
-    save(args.dev_eval_file, dev_eval, message="dev eval")
-    save(args.word2idx_file, word2idx_dict, message="word dictionary")
-    save(args.char2idx_file, char2idx_dict, message="char dictionary")
-    save(args.dev_meta_file, dev_meta, message="dev meta")
+    save(args.char_bert_emb_file, char_emb_mat, message="char embedding")
+    save(args.train_bert_eval_file, train_eval, message="train eval")
+    save(args.dev_bert_eval_file, dev_eval, message="dev eval")
+    save(args.char2idx_bert_file, char2idx_dict, message="char dictionary")
+    save(args.dev_bert_meta_file, dev_meta, message="dev meta")
 
 
 if __name__ == '__main__':
@@ -448,14 +444,11 @@ if __name__ == '__main__':
 
 
     # Import spacy language model
-    tokenizer= BertTokenizer.from_pretrained('bert-base-uncased')
+    bert_tokenizer= BertTokenizer.from_pretrained('bert-base-uncased')
 
     # Preprocess dataset
     args_.train_file = url_to_data_path(args_.train_url)
     args_.dev_file = url_to_data_path(args_.dev_url)
     if args_.include_test_examples:
         args_.test_file = url_to_data_path(args_.test_url)
-    glove_dir = url_to_data_path(args_.glove_url.replace('.zip', ''))
-    glove_ext = '.txt' if glove_dir.endswith('d') else '.{}d.txt'.format(args_.glove_dim)
-    args_.glove_file = os.path.join(glove_dir, os.path.basename(glove_dir) + glove_ext)
-    pre_process(args_)
+    pre_process(args_, bert_tokenizer)
