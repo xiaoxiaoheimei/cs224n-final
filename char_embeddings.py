@@ -1,5 +1,5 @@
 ####################################
-## File: char_encoder.py           ##
+## File: char_embeddings.py        ##
 ## Author: Liu Yang                ##
 ## Email: liuyeung@stanford.edu    ##
 ####################################
