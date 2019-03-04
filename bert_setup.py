@@ -319,7 +319,7 @@ def is_answerable(example):
     return len(example['y2s']) > 0 and len(example['y1s']) > 0
 
 
-def build_features(args, examples, data_type, out_file, word2idx_dict, char2idx_dict, is_test=False):
+def build_features(args, examples, bert_tokenizer, data_type, out_file, char2idx_dict, is_test=False):
     para_limit = args.test_para_limit if is_test else args.para_limit
     ques_limit = args.test_ques_limit if is_test else args.ques_limit
     ans_limit = args.ans_limit
@@ -355,28 +355,19 @@ def build_features(args, examples, data_type, out_file, word2idx_dict, char2idx_
 
         total += 1
 
-        def _get_word(word):
-            for each in (word, word.lower(), word.capitalize(), word.upper()):
-                if each in word2idx_dict:
-                    return word2idx_dict[each]
-            return 1
-
         def _get_char(char):
             if char in char2idx_dict:
                 return char2idx_dict[char]
             return 1
 
-        context_idx = np.zeros([para_limit], dtype=np.int32)
+        context_idx = np.array(bert_tokenizer.convert_tokens_to_ids(example["context_tokens"]), dtype=np.int32)
+        context_idx = np.pad(context_idx, (0, para_limit - len(context_idx)), 'constant', constant_values=0)
         context_char_idx = np.zeros([para_limit, char_limit], dtype=np.int32)
-        ques_idx = np.zeros([ques_limit], dtype=np.int32)
+        ques_idx = np.array(bert_tokenizer.convert_tokens_to_ids(example["ques_tokens"]), dtype=np.int32)
+        ques_idx = np.pad(ques_idx, (0, ques_limit - len(ques_idx)), 'constant', constant_values=0)
         ques_char_idx = np.zeros([ques_limit, char_limit], dtype=np.int32)
 
-        for i, token in enumerate(example["context_tokens"]):
-            context_idx[i] = _get_word(token)
         context_idxs.append(context_idx)
-
-        for i, token in enumerate(example["ques_tokens"]):
-            ques_idx[i] = _get_word(token)
         ques_idxs.append(ques_idx)
 
         for i, token in enumerate(example["context_chars"]):
