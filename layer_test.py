@@ -3,10 +3,13 @@
 ## Author: Liu Yang                ##
 ## Email: liuyeung@stanford.edu    ##
 ####################################
+import torch.nn as nn
 from char_embeddings import CharEmbeddings
 import torch as t
 import util
 from joint_context_layers import CharQAMultualContext, ConcatContext, AnswerablePredictor, StartLocationPredictor, EndLocationPredictor
+from bert_word_embeddings import BertWordEmbedding
+from pytorch_pretrained_bert import modeling
 import pdb
 
 def test_char_embeddings(data_item):
@@ -104,7 +107,8 @@ def test_end_predictor():
     assert tuple(p_end.size()) == (batch_size, ctx_len)
     print("Pass the test of end predictor layer!")
 
-def main(dataset):
+def normal_test():
+    dataset = util.SQuAD('./data/train.npz', True)
     test_char_embeddings(dataset[0]);
     test_qa_multual_context(dataset)
     test_concat_context()
@@ -112,6 +116,29 @@ def main(dataset):
     test_start_predictor()
     test_end_predictor()
 
+def bert_test():
+    batch_size = 40
+    t.cuda.set_device(0)
+    dataset = util.BertSQuAD('./data/bert_dev.npz')
+    ctx_idxs = dataset[1:1+batch_size][0].cuda()
+    ques_idxs = dataset[1:1+batch_size][2].cuda()
+    ctx_mask = t.zeros_like(ctx_idxs) != ctx_idxs
+    ctx_mask = ctx_mask.cuda()
+    ques_mask = t.zeros_like(ques_idxs) != ques_idxs
+    ques_mask = ques_mask.cuda()
+    hidden_size = 384
+    config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=hidden_size,num_hidden_layers=6, num_attention_heads=12, intermediate_size=1536) 
+    device = t.device("cuda")
+    bert_emb_model = BertWordEmbedding(config, device)
+    bert_emb_model.to('cuda')
+    bert_emb_model = nn.DataParallel(bert_emb_model, [0, 1])
+    bert_emb_model.eval()
+    bert_ctx_emb = bert_emb_model(ques_idxs, ctx_idxs, ques_mask, ctx_mask)
+    ctx_len = ctx_idxs.size(1)
+    print(bert_ctx_emb.size())
+    assert tuple(bert_ctx_emb.size()) == (batch_size, ctx_len, hidden_size)
+    print("Pass the test of BertEmbedding Layer!")
+
 if __name__ == '__main__':
-   dataset = util.SQuAD('./data/train.npz', True)
-   main(dataset)
+    #normal_test()
+    bert_test()
