@@ -24,7 +24,7 @@ class BertWordEmbedding(nn.Module):
           self.CLS = tokenizer.convert_tokens_to_ids(['[CLS]'])[0] #ID of the Bert [CLS] token
           self.SEP = tokenizer.convert_tokens_to_ids(['[SEP]'])[0] #ID of the Bert [SEP] token
 
-      def make_bert_input(ques_idxs, ctx_idxs, ques_mask, ctx_mask):
+      def make_bert_input(self, ques_idxs, ctx_idxs, ques_mask, ctx_mask):
           '''
           Args:
             @ques_idxs (tensor): Bert IDs of the question. (batch_size, q_len) Note that the q_len is a fixed number due to padding/clamping policy
@@ -53,4 +53,30 @@ class BertWordEmbedding(nn.Module):
 
           return qa_idxs, segment_ids, bert_att
 
+      def parse_context_rep(self, qa_encoder_rep, ctx_len):
+          '''
+          parse the context from the last layer encoder of the Bert.
+          Args:
+            @qa_encoder_rep (tensor): last layer encoder of the Bert (batch_size, q_len + ctx_len + 3, bert_hidden_size)
+            @ctx_len (int): the context length. 
+          Return:
+            ctx_rep (tensor): contextual repersentation condition on question. (batch_size, ctx_len, bert_hidden_size)
+          '''
+          ctx_rep = qa_encoder_rep[-1-ctx_len:-1] #skip the last SEP
+          return ctx_rep
 
+      def forward(self, ques_idxs, ctx_idxs, ques_mask, ctx_mask):
+          '''
+          Args:
+            @ques_idxs (tensor): Bert IDs of the question. (batch_size, q_len) Note that the q_len is a fixed number due to padding/clamping policy
+            @ctx_idxs (tensor): Bert IDs of the context. (batch_size, ctx_len) Note that the ctx_len is a fixed number due to padding/clamping policy
+            @ques_mask (tensor): elementwise 0,1 tensor to real token in question. (batch_size, q_len)
+            @ctx_mask (tensor): elementwise 0,1 tensor to real token in context. (batch_size, ctx_len)
+          Return:
+            bert_ctx_emb (tensor): contextual embedding condition on question. (batch_size, ctx_len, bert_hidden_size)
+          '''
+          qa_idxs, segment_ids, bert_att = self.make_bert_input(ques_idxs, ctx_idxs, ques_mask, ctx_mask)
+          ctx_code, _ = self.bert(qa_idxs, segment_ids, bert_att, output_all_encoded_layers=False)
+          bert_ctx_emb = self.parse_context_rep(ctx_code, ctx_idxs.size(1))
+          return bert_ctx_emb
+ 
