@@ -9,6 +9,7 @@ import torch as t
 import util
 from joint_context_layers import CharQAMultualContext, ConcatContext, AnswerablePredictor, StartLocationPredictor, EndLocationPredictor
 from bert_word_embeddings import BertWordEmbedding
+from joint_context_models import JointContextQA
 from pytorch_pretrained_bert import modeling
 import pdb
 
@@ -139,6 +140,36 @@ def bert_test():
     assert tuple(bert_ctx_emb.size()) == (batch_size, ctx_len, hidden_size)
     print("Pass the test of BertEmbedding Layer!")
 
+def bert_QA_test():
+    batch_size = 32
+    t.cuda.set_device(0)
+    dataset = util.BertSQuAD('./data/bert_dev.npz')
+
+    cw_idxs = dataset[1:1+batch_size][0].cuda()
+    cc_idxs = dataset[1:1+batch_size][1].cuda()
+    qw_idxs = dataset[1:1+batch_size][2].cuda()
+    qc_idxs = dataset[1:1+batch_size][3].cuda()
+
+    _, ctx_len = cw_idxs.size()
+
+    char_vectors = util.torch_from_json("./data/char_emb.json")
+    char_emb_dim = 256 
+    
+    bert_hidden_size = 576
+    config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=bert_hidden_size,num_hidden_layers=10, num_attention_heads=12, intermediate_size=1536) 
+    device = t.device("cuda")
+    bert_QA_model = JointContextQA(config, char_emb_dim, char_vectors, drop_prob=0.3,
+                         word_emb_dim=bert_hidden_size, cat_reduce_factor=0.5, lstm_dim_bm=bert_hidden_size, lstm_dim_pred=bert_hidden_size, device=t.device("cuda"))
+    bert_QA_model.to('cuda')
+    bert_QA_model = nn.DataParallel(bert_QA_model, [0, 1])
+    bert_QA_model.eval()
+    logits, start, end = bert_ctx_emb = bert_QA_model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
+    assert tuple(logits.size()) == (batch_size, 2)
+    assert tuple(start.size()) == (batch_size, ctx_len)
+    assert tuple(end.size()) == (batch_size, ctx_len)
+    print("Pass the test of JointContextQA model!")
+
 if __name__ == '__main__':
     #normal_test()
-    bert_test()
+    #bert_test()
+    bert_QA_test()

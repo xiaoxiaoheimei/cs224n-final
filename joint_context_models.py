@@ -7,8 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import util
-from joint_context_layers import CharQAMultualContext, ConcatContext, 
-                                 AnswerablePredictor, StartLocationPredictor, EndLocationPredictor
+from joint_context_layers import CharQAMultualContext, ConcatContext, AnswerablePredictor, StartLocationPredictor, EndLocationPredictor
 from char_embeddings import CharEmbeddings
 from bert_word_embeddings import BertWordEmbedding
 from layers import RNNEncoder
@@ -20,7 +19,7 @@ class JointContextQA(nn.Module):
       '''
 
       def __init__(self, bert_config, char_emb_dim, char_vector, drop_prob=0.3,
-                         word_emb_dim, cat_reduce_factor=0.5, lstm_dim_bm, lstm_dim_pred, device=torch.device("cpu")):
+                         word_emb_dim=768, cat_reduce_factor=0.5, lstm_dim_bm=768, lstm_dim_pred=768, device=torch.device("cpu")):
           '''
           Args:
             @param bert_config (BertConfig): the configuration for Bert word embedding layer.
@@ -42,7 +41,7 @@ class JointContextQA(nn.Module):
           self.mod = RNNEncoder(input_size=self.ctxConcat.output_dim, hidden_size=lstm_dim_bm, num_layers=2, drop_prob=drop_prob)
           M_dim = 2*lstm_dim_bm
           G_dim = self.ctxConcat.output_dim
-          self.predAnswer = AnswerablePredictor(input_dim=M_dim, lstm_hdim=lstm_dim_pred, drop_prob=drop_prob)
+          self.predAnswer = AnswerablePredictor(input_dim=(M_dim+G_dim), lstm_hdim=lstm_dim_pred, drop_prob=drop_prob)
           self.predStart = StartLocationPredictor(M_dim=M_dim, G_dim=G_dim, lstm_hdim=lstm_dim_pred, drop_prob=drop_prob)
           self.predEnd = EndLocationPredictor(M_dim=M_dim, G_dim=G_dim, lstm_hdim=lstm_dim_pred, drop_prob=drop_prob)
 
@@ -63,8 +62,10 @@ class JointContextQA(nn.Module):
           char_ctx_on_q = self.charCtx(cc_idxs, qc_idxs) #(batch_size, ctx_len, self.char_emb_dim)
           word_ctx_on_q = self.bertCtx(qw_idxs, cw_idxs, q_mask, ctx_mask) #(batch_size, ctx_len, self.word_emb_dim)
           G = self.ctxConcat(char_ctx_on_q, word_ctx_on_q) #(batch_size, ctx_len, G_dim)
+          #print("G.size:{}".format(G.size()))
           lengths = ctx_mask.sum(-1)
           M = self.mod(G, lengths) #(batch_size, M_dim)
+          #print("M.size:{}".format(M.size()))
           ans_logits, init_enc_start = self.predAnswer(M, G, ctx_mask) #(batch_size, 2), (batch_size, lstm_dim_pred)
           p_start, init_enc_end = self.predStart(M, G, ctx_mask, init_enc_start) #(batch_size, ctx_len), (batch_size, lstm_dim_pred)
           p_end = self.predEnd(M, G, ctx_mask, init_enc_start, init_enc_end) #(batch_size, ctx_len)
