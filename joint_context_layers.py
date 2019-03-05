@@ -28,6 +28,7 @@ class CharQAMultualContext(nn.Module):
          self.char_emb = CharEmbeddings(char_hidden_size, char_vector, drop_prob) 
          self.rnn = RNNEncoder(input_size=char_hidden_size, hidden_size=char_hidden_size, num_layers=2, drop_prob=drop_prob)
          self.biAtten = BiDAFAttention(hidden_size=2*char_hidden_size, drop_prob=drop_prob)
+         self.ctx_emb_dim = char_hidden_size*8 #the output embedding of the mutual context at character level
 
       def forward(self, cc_idxs, qc_idxs):
          '''
