@@ -168,6 +168,39 @@ def get_train_args():
                         type=float,
                         default=0.999,
                         help='Decay rate for exponential moving average of parameters.')
+    parser.add_argument('--train_bert_record_file',
+                        type=str,
+                        default='./data/bert_train.npz',
+                        help='Bert tokenized training set.')
+    parser.add_argument('--dev_bert_record_file',
+                        type=str,
+                        default='./data/bert_dev.npz',
+                        help='Bert tokenized dev set.')
+    parser.add_argument('--test_bert_record_file',
+                        type=str,
+                        default='./data/bert_test.npz',
+                        help='Bert tokenized test set.')
+    parser.add_argument('--train_bert_eval_file',
+                        type=str,
+                        default='./data/train_bert_eval.json')
+    parser.add_argument('--dev_bert_eval_file',
+                        type=str,
+                        default='./data/dev_bert_eval.json')
+    parser.add_argument('--test_bert_eval_file',
+                        type=str,
+                        default='./data/test_bert_eval.json')
+    parser.add_argument('--test_bert_meta_file',
+                        type=str,
+                        default='./data/test_bert_meta.json')
+    parser.add_argument('--char_bert_emb_file',
+                        type=str,
+                        default='./data/char_bert_emb.json')
+    parser.add_argument('--char2idx_bert_file',
+                        type=str,
+                        default='./data/bert_char2idx.json')
+    parser.add_argument('--dev_bert_meta_file',
+                        type=str,
+                        default='./data/dev_bert_meta.json')
 
     args = parser.parse_args()
 
@@ -258,7 +291,7 @@ def add_train_test_args(parser):
                         help='Base directory for saving information.')
     parser.add_argument('--batch_size',
                         type=int,
-                        default=64,
+                        default=16,
                         help='Batch size per GPU. Scales automatically when \
                               multiple GPUs are available.')
     parser.add_argument('--use_squad_v2',

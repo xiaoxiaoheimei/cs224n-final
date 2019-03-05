@@ -71,8 +71,21 @@ class JointContextQA(nn.Module):
           p_end = self.predEnd(M, G, ctx_mask, init_enc_start, init_enc_end) #(batch_size, ctx_len)
  
           return ans_logits, p_start, p_end
-          
 
+def compute_loss(ans_logits, p_start, p_end, y1, y2):
+    '''
+      Function:
+      compute the joint loss.
+    ''' 
+    ans_label = (y1 != -1).long() # 0 for no-answer, 1 for has-answer
+    ans_loss = F.cross_entropy(ans_logits, ans_label)
+
+    start_weight = -1. * ans_label.float() * p_start[:, y1].diag() #only keep element with ans_label = 1
+    end_weight = -1. * ans_label.float() * p_end[:, y2].diag() #only keep element with ans_label = 1
+    loc_loss = ans_loss + start_weight.sum(-1) + end_weight.sum(-1)
+         
+    loss = ans_loss + loc_loss
+    return loss
 
 
 

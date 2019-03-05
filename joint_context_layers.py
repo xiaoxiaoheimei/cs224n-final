@@ -172,7 +172,7 @@ class StartLocationPredictor(nn.Module):
           M1 = self.rnn(M, lengths, enc_init) #M2: (batch_size, ctx_len, 2*self.lstm_hdim)
           ctx = torch.cat((G, M1), 2) #(batch_size, ctx_len, self.cat_dim)
           logits = self.loc_proj(ctx).squeeze(-1) #(batch_size, ctx_len)
-          p_start = util.masked_softmax(logits, ctx_mask) #(batch_size, ctx_len)
+          p_start = util.masked_softmax(logits, ctx_mask, log_softmax=True) #(batch_size, ctx_len)
           
           #use probability as attention explaining the start prediction
           att = p_start.unsqueeze(1) #(batch_size, 1, ctx_len)
@@ -234,7 +234,7 @@ class EndLocationPredictor(nn.Module):
           M2 = self.rnn(M, lengths, (h0, c0)) #(batch_size, ctx_len, 2*lstm_hdim)
           ctx = torch.cat((G, M2), 2) #(batch_size, ctx_len, self.cat_dim)
           logits = self.loc_proj(ctx).squeeze(-1) #(batch_size, ctx_len)
-          p_end = util.masked_softmax(logits, ctx_mask)#(batch_size, ctx_len)
+          p_end = util.masked_softmax(logits, ctx_mask, log_softmax=True)#(batch_size, ctx_len)
 
           return p_end
           

@@ -120,19 +120,19 @@ def normal_test():
 def bert_test():
     batch_size = 40
     t.cuda.set_device(0)
+    device = t.device('cuda')
     dataset = util.BertSQuAD('./data/bert_dev.npz')
-    ctx_idxs = dataset[1:1+batch_size][0].cuda()
-    ques_idxs = dataset[1:1+batch_size][2].cuda()
+    ctx_idxs = dataset[1:1+batch_size][0].to(device)
+    ques_idxs = dataset[1:1+batch_size][2].to(device)
     ctx_mask = t.zeros_like(ctx_idxs) != ctx_idxs
-    ctx_mask = ctx_mask.cuda()
+    ctx_mask = ctx_mask.to(device)
     ques_mask = t.zeros_like(ques_idxs) != ques_idxs
-    ques_mask = ques_mask.cuda()
+    ques_mask = ques_mask.to(device)
     hidden_size = 384
     config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=hidden_size,num_hidden_layers=6, num_attention_heads=12, intermediate_size=1536) 
-    device = t.device("cuda")
     bert_emb_model = BertWordEmbedding(config, device)
-    bert_emb_model.to('cuda')
     bert_emb_model = nn.DataParallel(bert_emb_model, [0, 1])
+    bert_emb_model = bert_emb_model.to(device)
     bert_emb_model.eval()
     bert_ctx_emb = bert_emb_model(ques_idxs, ctx_idxs, ques_mask, ctx_mask)
     ctx_len = ctx_idxs.size(1)
@@ -171,5 +171,5 @@ def bert_QA_test():
 
 if __name__ == '__main__':
     #normal_test()
-    #bert_test()
-    bert_QA_test()
+    bert_test()
+    #bert_QA_test()

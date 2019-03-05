@@ -21,8 +21,10 @@ from models import BiDAF
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from ujson import load as json_load
-from util import collate_fn, SQuAD
+from util import collate_fn, SQuAD, BertSQuAD
 
+from pytorch_pretrained_bert import modeling
+from joint_context_models import JointContextQA, compute_loss
 
 def main(args):
     # Set up logging and devices
@@ -41,14 +43,18 @@ def main(args):
     torch.cuda.manual_seed_all(args.seed)
 
     # Get embeddings
-    log.info('Loading embeddings...')
-    word_vectors = util.torch_from_json(args.word_emb_file)
+    #log.info('Loading embeddings...')
+    #word_vectors = util.torch_from_json(args.word_emb_file)
 
     # Get model
     log.info('Building model...')
-    model = BiDAF(word_vectors=word_vectors,
-                  hidden_size=args.hidden_size,
-                  drop_prob=args.drop_prob)
+    char_vectors = util.torch_from_json("./data/char_emb.json")
+    char_emb_dim = 256
+    bert_hidden_size = 576
+    config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=bert_hidden_size,
+                                  num_hidden_layers=6, num_attention_heads=12, intermediate_size=1536)
+    model = JointContextQA(config, char_emb_dim, char_vectors, drop_prob=0.3, word_emb_dim=bert_hidden_size, 
+                            cat_reduce_factor=0.5, lstm_dim_bm=bert_hidden_size, lstm_dim_pred=bert_hidden_size, device=torch.device("cuda"))
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
         log.info('Loading checkpoint from {}...'.format(args.load_path))
@@ -73,13 +79,13 @@ def main(args):
 
     # Get data loader
     log.info('Building dataset...')
-    train_dataset = SQuAD(args.train_record_file, args.use_squad_v2)
+    train_dataset = BertSQuAD(args.train_bert_record_file, args.use_squad_v2)
     train_loader = data.DataLoader(train_dataset,
                                    batch_size=args.batch_size,
                                    shuffle=True,
                                    num_workers=args.num_workers,
                                    collate_fn=collate_fn)
-    dev_dataset = SQuAD(args.dev_record_file, args.use_squad_v2)
+    dev_dataset = BertSQuAD(args.dev_bert_record_file, args.use_squad_v2)
     dev_loader = data.DataLoader(dev_dataset,
                                  batch_size=args.batch_size,
                                  shuffle=False,
@@ -99,13 +105,16 @@ def main(args):
                 # Setup for forward
                 cw_idxs = cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
+                cc_idxs = cc_idxs.to(device)
+                qc_idxs = qc_idxs.to(device)
                 batch_size = cw_idxs.size(0)
                 optimizer.zero_grad()
 
                 # Forward
-                log_p1, log_p2 = model(cw_idxs, qw_idxs)
+                ans_logits, log_p_start, log_p_end = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
+                #print("log_p1.requires_grad:{}, log_p2:{}".format(log_p1.requires_grad, log_p2.requires_grad))
                 y1, y2 = y1.to(device), y2.to(device)
-                loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
+                loss = compute_loss(ans_logits, log_p_start, log_p_end, y1, y2)
                 loss_val = loss.item()
 
                 # Backward
@@ -133,7 +142,7 @@ def main(args):
                     log.info('Evaluating at step {}...'.format(step))
                     ema.assign(model)
                     results, pred_dict = evaluate(model, dev_loader, device,
-                                                  args.dev_eval_file,
+                                                  args.dev_bert_eval_file,
                                                   args.max_ans_len,
                                                   args.use_squad_v2)
                     saver.save(step, model, results[args.metric_name], device)
@@ -150,7 +159,7 @@ def main(args):
                         tbx.add_scalar('dev/{}'.format(k), v, step)
                     util.visualize(tbx,
                                    pred_dict=pred_dict,
-                                   eval_path=args.dev_eval_file,
+                                   eval_path=args.dev_bert_eval_file,
                                    step=step,
                                    split='dev',
                                    num_visuals=args.num_visuals)
@@ -169,16 +178,19 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             # Setup for forward
             cw_idxs = cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
+            cc_idxs = cc_idxs.to(device)
+            qc_idxs = qc_idxs.to(device)
             batch_size = cw_idxs.size(0)
 
             # Forward
-            log_p1, log_p2 = model(cw_idxs, qw_idxs)
+            ans_logits, log_p_start, log_p_end = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
             y1, y2 = y1.to(device), y2.to(device)
-            loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
+            loss = compute_loss(ans_logits, log_p_start, log_p_end, y1, y2)
             nll_meter.update(loss.item(), batch_size)
 
             # Get F1 and EM scores
-            p1, p2 = log_p1.exp(), log_p2.exp()
+            #NOTE: Evaluation below has some confilicts with our current design
+            p1, p2 = log_p_start.exp(), log_p_end.exp()
             starts, ends = util.discretize(p1, p2, max_len, use_squad_v2)
 
             # Log info
