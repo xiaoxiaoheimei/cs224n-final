@@ -77,6 +77,7 @@ def compute_loss(ans_logits, p_start, p_end, y1, y2):
       Function:
       compute the joint loss.
     ''' 
+    batch_size = ans_logits.size(0)
     ans_label = (y1 != -1).long() # 0 for no-answer, 1 for has-answer
     weight = torch.tensor([2., 1.], device=torch.device("cuda")) #punish 0 prediction more to avoid the tendency to predict 1 in which case accounts the location loss
     ans_loss = F.cross_entropy(ans_logits, ans_label, weight=weight, size_average=False)
@@ -85,7 +86,7 @@ def compute_loss(ans_logits, p_start, p_end, y1, y2):
     end_weight = -1. * ans_label.float() * p_end[:, y2].diag() #only keep element with ans_label = 1
     loc_loss = ans_loss + start_weight.sum(-1) + end_weight.sum(-1)
          
-    loss = ans_loss + loc_loss
+    loss = (ans_loss + loc_loss)/batch_size
     return loss
 
 
