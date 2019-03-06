@@ -49,8 +49,8 @@ def main(args):
     # Get model
     log.info('Building model...')
     char_vectors = util.torch_from_json("./data/char_emb.json")
-    char_emb_dim = 256
-    bert_hidden_size = 576
+    char_emb_dim = 128
+    bert_hidden_size = 384
     config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=bert_hidden_size,
                                   num_hidden_layers=6, num_attention_heads=12, intermediate_size=1536)
     model = JointContextQA(config, char_emb_dim, char_vectors, drop_prob=0.3, word_emb_dim=bert_hidden_size, 
@@ -197,8 +197,9 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             progress_bar.update(batch_size)
             progress_bar.set_postfix(NLL=nll_meter.avg)
 
-            preds, _ = util.convert_tokens(gold_dict,
+            preds, _ = util.bert_convert_tokens(gold_dict,
                                            ids.tolist(),
+                                           ans_logits,
                                            starts.tolist(),
                                            ends.tolist(),
                                            use_squad_v2)

@@ -694,6 +694,38 @@ def convert_tokens(eval_dict, qa_id, y_start_list, y_end_list, no_answer):
             sub_dict[uuid] = context[start_idx: end_idx]
     return pred_dict, sub_dict
 
+def bert_convert_tokens(eval_dict, qa_id, ans_logits, y_start_list, y_end_list, no_answer):
+    """Convert predictions to tokens from the context.
+
+    Args:
+        eval_dict (dict): Dictionary with eval info for the dataset. This is
+            used to perform the mapping from IDs and indices to actual text.
+        qa_id (int): List of QA example IDs.
+        y_start_list (list): List of start predictions.
+        y_end_list (list): List of end predictions.
+        no_answer (bool): Questions can have no answer. E.g., SQuAD 2.0.
+
+    Returns:
+        pred_dict (dict): Dictionary index IDs -> predicted answer text.
+        sub_dict (dict): Dictionary UUIDs -> predicted answer text (submission).
+    """
+    pred_dict = {}
+    sub_dict = {}
+    pred_label = ans_logits[:, 1] > ans_logits[:, 0]
+    pred_label = pred_label.tolist()
+    for qid, pred_ans, y_start, y_end in zip(qa_id, pred_label, y_start_list, y_end_list):
+        context = eval_dict[str(qid)]["context"]
+        spans = eval_dict[str(qid)]["spans"]
+        uuid = eval_dict[str(qid)]["uuid"]
+        if no_answer and (pred_ans == 0):
+            pred_dict[str(qid)] = ''
+            sub_dict[uuid] = ''
+        else:
+            start_idx = spans[y_start][0]
+            end_idx = spans[y_end][1]
+            pred_dict[str(qid)] = context[start_idx: end_idx]
+            sub_dict[uuid] = context[start_idx: end_idx]
+    return pred_dict, sub_dict
 
 def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     if not ground_truths:
