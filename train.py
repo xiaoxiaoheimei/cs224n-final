@@ -24,6 +24,7 @@ from ujson import load as json_load
 from util import collate_fn, SQuAD, BertSQuAD
 
 from pytorch_pretrained_bert import modeling
+from pytorch_pretrained_bert.optimization import BertAdam, warmup_linear
 from joint_context_models import JointContextQA, compute_loss
 
 def main(args):
@@ -62,6 +63,15 @@ def main(args):
     else:
         step = 0
     model = model.to(device)
+    #prepare to use Bert optimizer
+    param_optimizer = list(model.named_parameters())
+    param_optimizer = [n for n in param_optimizer if 'pooler' not in n[0]]
+    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+    optimizer_grouped_parameters = [
+        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        ]
+
     model.train()
     ema = util.EMA(model, args.ema_decay)
 
@@ -73,9 +83,9 @@ def main(args):
                                  log=log)
 
     # Get optimizer and scheduler
-    optimizer = optim.Adadelta(model.parameters(), args.lr,
-                               weight_decay=args.l2_wd)
-    scheduler = sched.LambdaLR(optimizer, lambda s: 1.)  # Constant LR
+    #optimizer = optim.Adadelta(model.parameters(), args.lr,
+    #                           weight_decay=args.l2_wd)
+    #scheduler = sched.LambdaLR(optimizer, lambda s: 1.)  # Constant LR
 
     # Get data loader
     log.info('Building dataset...')
@@ -91,6 +101,9 @@ def main(args):
                                  shuffle=False,
                                  num_workers=args.num_workers,
                                  collate_fn=collate_fn)
+
+    num_train_optimization_steps = int(len(train_dataset) / args.batch_size) * args.num_epochs
+    optimizer = BertAdam(optimizer_grouped_parameters, lr=5e-5, warmup=0.1, t_total=num_train_optimization_steps)
 
     # Train
     log.info('Training...')
@@ -121,8 +134,9 @@ def main(args):
                 loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                 optimizer.step()
-                scheduler.step(step // batch_size)
+                #scheduler.step(step // batch_size)
                 ema(model, step // batch_size)
+                optimizer.zero_grad()
 
                 # Log info
                 step += batch_size
