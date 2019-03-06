@@ -53,7 +53,7 @@ def main(args):
     char_emb_dim = 128
     bert_hidden_size = 384
     config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=bert_hidden_size,
-                                  num_hidden_layers=6, num_attention_heads=12, intermediate_size=768)
+                                  num_hidden_layers=6, num_attention_heads=12, intermediate_size=1536)
     model = JointContextQA(config, char_emb_dim, char_vectors, drop_prob=0.2, word_emb_dim=bert_hidden_size, 
                             cat_reduce_factor=1., lstm_dim_bm=bert_hidden_size, lstm_dim_pred=bert_hidden_size, device=torch.device("cuda"))
     model = nn.DataParallel(model, args.gpu_ids)
