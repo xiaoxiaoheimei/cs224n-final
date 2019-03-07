@@ -234,6 +234,23 @@ def get_test_args():
                         default='submission.csv',
                         help='Name for submission file.')
 
+    parser.add_argument('--dev_bert_record_file',
+                        type=str,
+                        default='./data/bert_dev.npz',
+                        help='Bert tokenized dev set.')
+    parser.add_argument('--test_bert_record_file',
+                        type=str,
+                        default='./data/bert_test.npz',
+                        help='Bert tokenized test set.')
+    parser.add_argument('--dev_bert_eval_file',
+                        type=str,
+                        default='./data/dev_bert_eval.json')
+    parser.add_argument('--test_bert_eval_file',
+                        type=str,
+                        default='./data/test_bert_eval.json')
+
+
+
     # Require load_path for test.py
     args = parser.parse_args()
     if not args.load_path:

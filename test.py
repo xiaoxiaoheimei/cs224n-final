@@ -26,7 +26,10 @@ from os.path import join
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from ujson import load as json_load
-from util import collate_fn, SQuAD
+from util import collate_fn, SQuAD, BertSQuAD
+
+from pytorch_pretrained_bert import modeling
+from joint_context_models import JointContextQA, compute_loss
 
 
 def main(args):
@@ -37,14 +40,15 @@ def main(args):
     device, gpu_ids = util.get_available_devices()
     args.batch_size *= max(1, len(gpu_ids))
 
-    # Get embeddings
-    log.info('Loading embeddings...')
-    word_vectors = util.torch_from_json(args.word_emb_file)
-
     # Get model
     log.info('Building model...')
-    model = BiDAF(word_vectors=word_vectors,
-                  hidden_size=args.hidden_size)
+    char_vectors = util.torch_from_json("./data/char_emb.json")
+    char_emb_dim = 128
+    bert_hidden_size = 384
+    config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=bert_hidden_size,
+                                  num_hidden_layers=6, num_attention_heads=12, intermediate_size=1536)
+    model = JointContextQA(config, char_emb_dim, char_vectors, drop_prob=0.3, word_emb_dim=bert_hidden_size,
+                            cat_reduce_factor=0.5, lstm_dim_bm=bert_hidden_size, lstm_dim_pred=bert_hidden_size, device=torch.device("cuda"))
     model = nn.DataParallel(model, gpu_ids)
     log.info('Loading checkpoint from {}...'.format(args.load_path))
     model = util.load_model(model, args.load_path, gpu_ids, return_step=False)
@@ -53,8 +57,8 @@ def main(args):
 
     # Get data loader
     log.info('Building dataset...')
-    record_file = vars(args)['{}_record_file'.format(args.split)]
-    dataset = SQuAD(record_file, args.use_squad_v2)
+    record_file = vars(args)['{}_bert_record_file'.format(args.split)]
+    dataset = BertSQuAD(record_file, args.use_squad_v2)
     data_loader = data.DataLoader(dataset,
                                   batch_size=args.batch_size,
                                   shuffle=False,
@@ -66,7 +70,7 @@ def main(args):
     nll_meter = util.AverageMeter()
     pred_dict = {}  # Predictions for TensorBoard
     sub_dict = {}   # Predictions for submission
-    eval_file = vars(args)['{}_eval_file'.format(args.split)]
+    eval_file = vars(args)['{}_bert_eval_file'.format(args.split)]
     with open(eval_file, 'r') as fh:
         gold_dict = json_load(fh)
     with torch.no_grad(), \
@@ -75,16 +79,18 @@ def main(args):
             # Setup for forward
             cw_idxs = cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
+            cc_idxs = cc_idxs.to(device)
+            qc_idxs = qc_idxs.to(device)
             batch_size = cw_idxs.size(0)
 
             # Forward
-            log_p1, log_p2 = model(cw_idxs, qw_idxs)
+            ans_logits, log_p_start, log_p_end = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
             y1, y2 = y1.to(device), y2.to(device)
-            loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
+            loss = compute_loss(ans_logits, log_p_start, log_p_end, y1, y2)
             nll_meter.update(loss.item(), batch_size)
 
             # Get F1 and EM scores
-            p1, p2 = log_p1.exp(), log_p2.exp()
+            p1, p2 = log_p_start.exp(), log_p_end.exp()
             starts, ends = util.discretize(p1, p2, args.max_ans_len, args.use_squad_v2)
 
             # Log info
@@ -93,8 +99,9 @@ def main(args):
                 # No labels for the test set, so NLL would be invalid
                 progress_bar.set_postfix(NLL=nll_meter.avg)
 
-            idx2pred, uuid2pred = util.convert_tokens(gold_dict,
+            idx2pred, uuid2pred = util.bert_convert_tokens(gold_dict,
                                                       ids.tolist(),
+                                                      ans_logits,
                                                       starts.tolist(),
                                                       ends.tolist(),
                                                       args.use_squad_v2)
