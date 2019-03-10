@@ -23,6 +23,7 @@ from json import dumps
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from ujson import load as json_load
+from util import collate_fn, SQuAD, BertSQuAD
 
 #####################################
 ## File: char_embedding.py         ##
