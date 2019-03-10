@@ -326,7 +326,7 @@ class BiDAF(nn.Module):
         self.out = BiDAFOutput(hidden_size=hidden_size,
                                       drop_prob=drop_prob)
 
-    def forward(self, cw_idxs, qw_idxs):
+    def forward(self, cc_idxs, qc_idxs):
 
         cc_indicator = cc_idxs.sum(-1) #(batch_size, ctx_len)
         qc_indicator = qc_idxs.sum(-1) #(batch_size, q_len)
