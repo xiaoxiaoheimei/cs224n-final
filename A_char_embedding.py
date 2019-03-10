@@ -342,11 +342,11 @@ class BiDAF(nn.Module):
         q_enc = self.enc(qc_emb, qc_len)    # (batch_size, q_len, 2 * hidden_size)
 
         att = self.att(c_enc, q_enc,
-                       c_mask, q_mask)    # (batch_size, c_len, 8 * hidden_size)
+                       cc_mask, qc_mask)    # (batch_size, c_len, 8 * hidden_size)
 
-        mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * hidden_size)
+        mod = self.mod(att, cc_len)        # (batch_size, c_len, 2 * hidden_size)
 
-        out = self.out(att, mod, c_mask)  # 2 tensors, each (batch_size, c_len)
+        out = self.out(att, mod, cc_mask)  # 2 tensors, each (batch_size, c_len)
 
         return out
 
