@@ -7,6 +7,7 @@ Author:
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import util
 
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from util import masked_softmax
