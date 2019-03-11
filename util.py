@@ -86,6 +86,58 @@ class SQuAD(data.Dataset):
     def __len__(self):
         return len(self.valid_idxs)
 
+class BertSQuAD(data.Dataset):
+    """Stanford Question Answering Dataset (SQuAD) with Bert Token.
+
+    Each item in the dataset is a tuple with the following entries (in order):
+        - context_idxs: Bert ID of the words in the context.
+            Shape (context_len,).
+        - context_char_idxs: Characer IDs (without '##') of each Bert token.
+            Shape (context_len, max_word_len).
+        - question_idxs: Bert ID of the words in the question.
+            Shape (question_len,).
+        - question_char_idxs: ID of the characters of Bert tokens in the question.
+            Shape (question_len, max_word_len).
+        - y1: Index of word in the context where the answer begins.
+            -1 if no answer.
+        - y2: Index of word in the context where the answer ends.
+            -1 if no answer.
+        - id: ID of the example.
+
+    Args:
+        data_path (str): Path to .npz file containing pre-processed dataset.
+        use_v2 (bool): Whether to use SQuAD 2.0 questions. Otherwise only use SQuAD 1.1.
+    """
+    def __init__(self, data_path, use_v2=True):
+        super(BertSQuAD, self).__init__()
+
+        dataset = np.load(data_path)
+        self.context_idxs = torch.from_numpy(dataset['context_idxs']).long()
+        self.context_char_idxs = torch.from_numpy(dataset['context_char_idxs']).long()
+        self.question_idxs = torch.from_numpy(dataset['ques_idxs']).long()
+        self.question_char_idxs = torch.from_numpy(dataset['ques_char_idxs']).long()
+        self.y1s = torch.from_numpy(dataset['y1s']).long()
+        self.y2s = torch.from_numpy(dataset['y2s']).long()
+
+        # SQuAD 1.1: Ignore no-answer examples
+        self.ids = torch.from_numpy(dataset['ids']).long()
+        self.valid_idxs = [idx for idx in range(len(self.ids))
+                           if use_v2 or self.y1s[idx].item() >= 0]
+
+    def __getitem__(self, idx):
+        idx = self.valid_idxs[idx]
+        example = (self.context_idxs[idx],
+                   self.context_char_idxs[idx],
+                   self.question_idxs[idx],
+                   self.question_char_idxs[idx],
+                   self.y1s[idx],
+                   self.y2s[idx],
+                   self.ids[idx])
+
+        return example
+
+    def __len__(self):
+        return len(self.valid_idxs)
 
 def collate_fn(examples):
     """Create batch tensors from a list of individual examples returned
@@ -642,6 +694,38 @@ def convert_tokens(eval_dict, qa_id, y_start_list, y_end_list, no_answer):
             sub_dict[uuid] = context[start_idx: end_idx]
     return pred_dict, sub_dict
 
+def bert_convert_tokens(eval_dict, qa_id, ans_logits, y_start_list, y_end_list, no_answer):
+    """Convert predictions to tokens from the context.
+
+    Args:
+        eval_dict (dict): Dictionary with eval info for the dataset. This is
+            used to perform the mapping from IDs and indices to actual text.
+        qa_id (int): List of QA example IDs.
+        y_start_list (list): List of start predictions.
+        y_end_list (list): List of end predictions.
+        no_answer (bool): Questions can have no answer. E.g., SQuAD 2.0.
+
+    Returns:
+        pred_dict (dict): Dictionary index IDs -> predicted answer text.
+        sub_dict (dict): Dictionary UUIDs -> predicted answer text (submission).
+    """
+    pred_dict = {}
+    sub_dict = {}
+    pred_label = ans_logits[:, 1] > ans_logits[:, 0]
+    pred_label = pred_label.tolist()
+    for qid, pred_ans, y_start, y_end in zip(qa_id, pred_label, y_start_list, y_end_list):
+        context = eval_dict[str(qid)]["context"]
+        spans = eval_dict[str(qid)]["spans"]
+        uuid = eval_dict[str(qid)]["uuid"]
+        if no_answer and (pred_ans == 0):
+            pred_dict[str(qid)] = ''
+            sub_dict[uuid] = ''
+        else:
+            start_idx = spans[y_start][0]
+            end_idx = spans[y_end][1]
+            pred_dict[str(qid)] = context[start_idx: end_idx]
+            sub_dict[uuid] = context[start_idx: end_idx]
+    return pred_dict, sub_dict
 
 def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     if not ground_truths:
@@ -655,6 +739,7 @@ def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
 
 def eval_dicts(gold_dict, pred_dict, no_answer):
     avna = f1 = em = total = 0
+    tp = tn = fp = fn = 0
     for key, value in pred_dict.items():
         total += 1
         ground_truths = gold_dict[key]['answers']
@@ -663,12 +748,20 @@ def eval_dicts(gold_dict, pred_dict, no_answer):
         f1 += metric_max_over_ground_truths(compute_f1, prediction, ground_truths)
         if no_answer:
             avna += compute_avna(prediction, ground_truths)
+            tp += compute_tp(prediction, ground_truths)
+            tn += compute_tn(prediction, ground_truths)
+            fp += compute_fp(prediction, ground_truths)
+            fn += compute_fn(prediction, ground_truths)
 
     eval_dict = {'EM': 100. * em / total,
                  'F1': 100. * f1 / total}
 
     if no_answer:
         eval_dict['AvNA'] = 100. * avna / total
+        eval_dict['TP'] = 100. * tp / total
+        eval_dict['TN'] = 100. * tn / total
+        eval_dict['FP'] = 100. * fp / total
+        eval_dict['FN'] = 100. * fn / total
 
     return eval_dict
 
@@ -676,6 +769,16 @@ def eval_dicts(gold_dict, pred_dict, no_answer):
 def compute_avna(prediction, ground_truths):
     """Compute answer vs. no-answer accuracy."""
     return float(bool(prediction) == bool(ground_truths))
+
+
+def compute_tp(prediction, ground_truths):
+    return float((bool(prediction) == bool(ground_truths)) & (bool(ground_truths) == True))
+def compute_tn(prediction, ground_truths):
+    return float((bool(prediction) == bool(ground_truths)) & (bool(ground_truths) == False))
+def compute_fp(prediction, ground_truths):
+    return float((bool(prediction) != bool(ground_truths)) & (bool(prediction) == True))
+def compute_fn(prediction, ground_truths):
+    return float((bool(prediction) != bool(ground_truths)) & (bool(prediction) == False))
 
 
 # All methods below this line are from the official SQuAD 2.0 eval script

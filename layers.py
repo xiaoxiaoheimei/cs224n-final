@@ -92,7 +92,7 @@ class RNNEncoder(nn.Module):
                            bidirectional=True,
                            dropout=drop_prob if num_layers > 1 else 0.)
 
-    def forward(self, x, lengths):
+    def forward(self, x, lengths, init_enc=None):
         # Save original padded length for use by pad_packed_sequence
         orig_len = x.size(1)
 
@@ -102,7 +102,7 @@ class RNNEncoder(nn.Module):
         x = pack_padded_sequence(x, lengths, batch_first=True)
 
         # Apply RNN
-        x, _ = self.rnn(x)  # (batch_size, seq_len, 2 * hidden_size)
+        x, _ = self.rnn(x) if init_enc is None else self.rnn(x, init_enc) # (batch_size, seq_len, 2 * hidden_size)
 
         # Unpack and reverse sort
         x, _ = pad_packed_sequence(x, batch_first=True, total_length=orig_len)
