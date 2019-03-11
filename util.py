@@ -739,6 +739,7 @@ def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
 
 def eval_dicts(gold_dict, pred_dict, no_answer):
     avna = f1 = em = total = 0
+    tp = tn = fp = fn = 0
     for key, value in pred_dict.items():
         total += 1
         ground_truths = gold_dict[key]['answers']
@@ -747,12 +748,20 @@ def eval_dicts(gold_dict, pred_dict, no_answer):
         f1 += metric_max_over_ground_truths(compute_f1, prediction, ground_truths)
         if no_answer:
             avna += compute_avna(prediction, ground_truths)
+            tp += compute_tp(prediction, ground_truths)
+            tn += compute_tn(prediction, ground_truths)
+            fp += compute_fp(prediction, ground_truths)
+            fn += compute_fn(prediction, ground_truths)
 
     eval_dict = {'EM': 100. * em / total,
                  'F1': 100. * f1 / total}
 
     if no_answer:
         eval_dict['AvNA'] = 100. * avna / total
+        eval_dict['TP'] = 100. * tp / total
+        eval_dict['TN'] = 100. * tn / total
+        eval_dict['FP'] = 100. * fp / total
+        eval_dict['FN'] = 100. * fn / total
 
     return eval_dict
 
@@ -760,6 +769,16 @@ def eval_dicts(gold_dict, pred_dict, no_answer):
 def compute_avna(prediction, ground_truths):
     """Compute answer vs. no-answer accuracy."""
     return float(bool(prediction) == bool(ground_truths))
+
+
+def compute_tp(prediction, ground_truths):
+    return float((bool(prediction) == bool(ground_truths)) & (bool(ground_truths) == True))
+def compute_tn(prediction, ground_truths):
+    return float((bool(prediction) == bool(ground_truths)) & (bool(ground_truths) == False))
+def compute_fp(prediction, ground_truths):
+    return float((bool(prediction) != bool(ground_truths)) & (bool(prediction) == True))
+def compute_fn(prediction, ground_truths):
+    return float((bool(prediction) != bool(ground_truths)) & (bool(prediction) == False))
 
 
 # All methods below this line are from the official SQuAD 2.0 eval script

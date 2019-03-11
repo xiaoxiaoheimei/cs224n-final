@@ -109,6 +109,10 @@ def main(args):
                         ('EM', results['EM'])]
         if args.use_squad_v2:
             results_list.append(('AvNA', results['AvNA']))
+            results_list.append(('TP', results['TP']))
+            results_list.append(('TN', results['TN']))
+            results_list.append(('FP', results['FP']))
+            results_list.append(('FN', results['FN']))
         results = OrderedDict(results_list)
 
         # Log to console
