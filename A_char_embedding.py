@@ -310,7 +310,7 @@ class BiDAF(nn.Module):
         #                            hidden_size=hidden_size,
         #                            drop_prob=drop_prob)
 
-        self.enc = RNNEncoder(input_size=hidden_size,
+        self.enc = RNNEncoder(input_size=char_hidden_size,
                                      hidden_size=hidden_size,
                                      num_layers=1,
                                      drop_prob=drop_prob)
