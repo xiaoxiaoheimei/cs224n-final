@@ -1,9 +1,3 @@
-"""Assortment of layers for use in models.py.
-
-Author:
-    Chris Chute (chute@stanford.edu)
-"""
-
 import numpy as np
 import random
 import torch
@@ -63,7 +57,7 @@ class CharEmbeddings(nn.Module):
         """
         super(CharEmbeddings, self).__init__()
         self.embed_size = embed_size
-        self.embeddings = nn.Embedding.from_pretrained(char_vector) #initialize the char embeddings from pretrain
+        self.embeddings = nn.Embedding.from_pretrained(char_vector, freeze=False) #initialize the char embeddings from pretrain
         self.cnn = CNN(self.embeddings.embedding_dim, embed_size)
         self.hy = HighwayEncoder(1, embed_size)
         self.dropout = nn.Dropout(p=drop_prob)
