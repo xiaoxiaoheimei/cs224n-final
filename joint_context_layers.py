@@ -66,9 +66,10 @@ class ConcatContext(nn.Module):
          '''
          super(ConcatContext, self).__init__()
          self.input_dim = w_ctx_dim + c_ctx_dim
-         self.output_dim = int(self.input_dim*reduce_factor)
-         self.dim_reducer = nn.Linear(self.input_dim, self.output_dim)
-         nn.init.xavier_uniform_(self.dim_reducer.weight)
+         #self.output_dim = int(self.input_dim*reduce_factor)
+         self.output_dim = w_ctx_dim + c_ctx_dim
+         #self.dim_reducer = nn.Linear(self.input_dim, self.output_dim)
+         #nn.init.xavier_uniform_(self.dim_reducer.weight)
          
       def forward(self, w_ctx, c_ctx):
          '''
@@ -79,8 +80,10 @@ class ConcatContext(nn.Module):
            ctx
          ''' 
          cat_ctx = torch.cat((w_ctx, c_ctx), 2) #(batch_size, ctx_len, w_ctx_dim + c_ctx_dim)
-         ctx = self.dim_reducer(cat_ctx)
-         return ctx
+         #ctx = self.dim_reducer(cat_ctx)
+         #return ctx
+         cat_ctx = F.dropout(cat_ctx, p=0.3, training=self.training)
+         return cat_ctx
 
 class AnswerablePredictor(nn.Module):
       '''
@@ -118,14 +121,17 @@ class AnswerablePredictor(nn.Module):
           '''
           ctx = torch.cat((G, M), 2) #(batch_size, ctx_len, self.input_dim)
           att = torch.matmul(ctx, self.att_weight).transpose(1,2) #(batch_size, 1, ctx_len)
+          att = F.dropout(att, p=0.3, training=self.training)
           att_prob = util.masked_softmax(att, ctx_mask.unsqueeze(1)) #(batch_size, 1, ctx_len)
           ctx_summary = torch.bmm(att_prob, ctx).squeeze(1) #(batch_size, self.input_dim)
+          ctx_summary = F.dropout(ctx_summary, p=0.3, training=self.training)
           h0 = self.h_proj(ctx_summary) #(batch_size, 2*self.lstm_hdim)
           h0 = h0.view(-1, 2, self.lstm_hdim).transpose(0,1) #(2, batch_size, self.lstm_hdim)
           c0 = self.c_proj(ctx_summary) #(batch_size, 2*self.lstm_hdim)
           c0 = c0.view(-1, 2, self.lstm_hdim).transpose(0,1) #(2, batch_size, self.lstm_hdim)
 
           logits = self.logits_proj(ctx_summary) #(batch_size, self.lstm_hdim)
+          logits = F.dropout(logits, p=0.3, training=self.training)
           h0 = F.dropout(h0, self.drop_prob, self.training).contiguous()
           c0 = F.dropout(c0, self.drop_prob, self.training).contiguous()
           
@@ -171,13 +177,16 @@ class StartLocationPredictor(nn.Module):
           lengths = ctx_mask.sum(-1) #(batch_size)
           M1 = self.rnn(M, lengths, enc_init) #M2: (batch_size, ctx_len, 2*self.lstm_hdim)
           ctx = torch.cat((G, M1), 2) #(batch_size, ctx_len, self.cat_dim)
+          ctx = F.dropout(ctx, p=0.3, training=self.training)
           logits = self.loc_proj(ctx).squeeze(-1) #(batch_size, ctx_len)
+          logits = F.dropout(logits, p=0.3, training=self.training)
           p_start = util.masked_softmax(logits, ctx_mask, log_softmax=True) #(batch_size, ctx_len)
           
           #use probability as attention explaining the start prediction
           att = p_start.unsqueeze(1) #(batch_size, 1, ctx_len)
           #use attention to obtain a summary of the context in respect to start prediction
           ctx_summary = torch.bmm(att, ctx).squeeze(1) #(batch_size, self.cat_dim)
+          ctx_summary = F.dropout(ctx_summary, p=0.3, training=self.training)
 
           h0 = self.h_proj(ctx_summary) #(batch_size, 2*self.lstm_hdim)
           h0 = h0.view(-1, 2, self.lstm_hdim).transpose(0,1) #(2, batch_size, self.lstm_hdim)
@@ -229,11 +238,13 @@ class EndLocationPredictor(nn.Module):
           lengths = ctx_mask.sum(-1) #(batch_size)
           (hA, cA) = enc_init_A
           (hs, cs) = enc_init_start
-          h0 = self.h_proj(torch.cat((hA, hs), 2)) #(2, batch_size, self.lstm_hdim)
-          c0 = self.h_proj(torch.cat((cA, cs), 2)) #(2, batch_size, self.lstm_hdim)
+          h0 = self.h_proj(torch.cat((hA, hs), 2)).contiguous() #(2, batch_size, self.lstm_hdim)
+          c0 = self.h_proj(torch.cat((cA, cs), 2)).contiguous() #(2, batch_size, self.lstm_hdim)
           M2 = self.rnn(M, lengths, (h0, c0)) #(batch_size, ctx_len, 2*lstm_hdim)
           ctx = torch.cat((G, M2), 2) #(batch_size, ctx_len, self.cat_dim)
+          ctx = F.dropout(ctx, p=0.3, training=self.training)
           logits = self.loc_proj(ctx).squeeze(-1) #(batch_size, ctx_len)
+          logits = F.dropout(logits, p=0.3, training=self.training)
           p_end = util.masked_softmax(logits, ctx_mask, log_softmax=True)#(batch_size, ctx_len)
 
           return p_end

@@ -21,7 +21,7 @@ class BertWordEmbedding(nn.Module):
             @config: configuration file of internal Bert layer
           '''
           super(BertWordEmbedding, self).__init__()
-          self.bert = modeling.BertModel(config=config)
+          self.bert = modeling.BertModel(config=config).from_pretrained('bert-base-uncased')
           self.device = device
           #self.bert.to('cuda')
           tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')

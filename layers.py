@@ -91,6 +91,7 @@ class RNNEncoder(nn.Module):
                            batch_first=True,
                            bidirectional=True,
                            dropout=drop_prob if num_layers > 1 else 0.)
+        self.rnn.flatten_parameters()
 
     def forward(self, x, lengths, init_enc=None):
         # Save original padded length for use by pad_packed_sequence
@@ -98,6 +99,7 @@ class RNNEncoder(nn.Module):
 
         # Sort by length and pack sequence for RNN
         lengths, sort_idx = lengths.sort(0, descending=True)
+        x = x.contiguous()
         x = x[sort_idx]     # (batch_size, seq_len, input_size)
         x = pack_padded_sequence(x, lengths, batch_first=True)
 
