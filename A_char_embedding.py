@@ -304,7 +304,7 @@ class BiDAF(nn.Module):
     def __init__(self, char_hidden_size, char_vector, hidden_size, drop_prob=0.):
         super(BiDAF, self).__init__()
 
-        self.char_emb = CharEmbeddings(char_hidden_size, char_vector, drop_prob) 
+        self.char_emb = CharEmbeddings(embed_size=char_hidden_size, char_vector=char_vector, drop_prob=drop_prob) 
 
         #self.emb = layers.Embedding(word_vectors=word_vectors,
         #                            hidden_size=hidden_size,
@@ -378,7 +378,8 @@ def main(args):
 
     # Get model
     log.info('Building model...')
-    model = BiDAF(char_hidden_size=128, char_vector=char_vectors,
+    char_emb_dim = 50
+    model = BiDAF(char_hidden_size=char_emb_dim, char_vector=char_vectors,
                   hidden_size=args.hidden_size,
                   drop_prob=args.drop_prob)
     model = nn.DataParallel(model, args.gpu_ids)
