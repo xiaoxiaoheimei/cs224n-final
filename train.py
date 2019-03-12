@@ -25,7 +25,9 @@ from util import collate_fn, SQuAD, BertSQuAD
 
 from pytorch_pretrained_bert import modeling
 from pytorch_pretrained_bert.optimization import BertAdam, warmup_linear
-from joint_context_models import JointContextQA, compute_loss
+from joint_context_models import JointContextQA, compute_loss, compute_loss_KL
+
+import pdb
 
 def main(args):
     # Set up logging and devices
@@ -73,7 +75,7 @@ def main(args):
         ]
 
     model.train()
-    ema = util.EMA(model, args.ema_decay)
+    #ema = util.EMA(model, args.ema_decay)
 
     # Get saver
     saver = util.CheckpointSaver(args.save_dir,
@@ -122,12 +124,13 @@ def main(args):
                 qc_idxs = qc_idxs.to(device)
                 batch_size = cw_idxs.size(0)
                 optimizer.zero_grad()
+                #pdb.set_trace()
 
                 # Forward
                 ans_logits, log_p_start, log_p_end = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
                 #print("log_p1.requires_grad:{}, log_p2:{}".format(log_p1.requires_grad, log_p2.requires_grad))
                 y1, y2 = y1.to(device), y2.to(device)
-                loss = compute_loss(ans_logits, log_p_start, log_p_end, y1, y2)
+                loss = compute_loss_KL(ans_logits, log_p_start, log_p_end, y1, y2, cw_idxs)
                 loss_val = loss.item()
 
                 # Backward
@@ -135,7 +138,7 @@ def main(args):
                 nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                 optimizer.step()
                 #scheduler.step(step // batch_size)
-                ema(model, step // batch_size)
+                #ema(model, step // batch_size)
                 optimizer.zero_grad()
 
                 # Log info
@@ -154,13 +157,13 @@ def main(args):
 
                     # Evaluate and save checkpoint
                     log.info('Evaluating at step {}...'.format(step))
-                    ema.assign(model)
+                    #ema.assign(model)
                     results, pred_dict = evaluate(model, dev_loader, device,
                                                   args.dev_bert_eval_file,
                                                   args.max_ans_len,
                                                   args.use_squad_v2)
                     saver.save(step, model, results[args.metric_name], device)
-                    ema.resume(model)
+                    #ema.resume(model)
 
                     # Log to console
                     results_str = ', '.join('{}: {:05.2f}'.format(k, v)
@@ -199,7 +202,7 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             # Forward
             ans_logits, log_p_start, log_p_end = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
             y1, y2 = y1.to(device), y2.to(device)
-            loss = compute_loss(ans_logits, log_p_start, log_p_end, y1, y2)
+            loss = compute_loss_KL(ans_logits, log_p_start, log_p_end, y1, y2, cw_idxs)
             nll_meter.update(loss.item(), batch_size)
 
             # Get F1 and EM scores

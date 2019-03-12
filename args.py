@@ -42,11 +42,11 @@ def get_setup_args():
                         default='./data/answer.json')
     parser.add_argument('--para_limit',
                         type=int,
-                        default=400,
+                        default=384,
                         help='Max number of words in a paragraph')
     parser.add_argument('--ques_limit',
                         type=int,
-                        default=50,
+                        default=64,
                         help='Max number of words to keep from a question')
     parser.add_argument('--test_para_limit',
                         type=int,
@@ -158,7 +158,7 @@ def get_train_args():
                         help='Maximum number of checkpoints to keep on disk.')
     parser.add_argument('--max_grad_norm',
                         type=float,
-                        default=5.0,
+                        default=10.0,
                         help='Maximum gradient norm for gradient clipping.')
     parser.add_argument('--seed',
                         type=int,
@@ -296,7 +296,7 @@ def add_train_test_args(parser):
                         help='Name to identify training or test run.')
     parser.add_argument('--max_ans_len',
                         type=int,
-                        default=15,
+                        default=30,
                         help='Maximum length of a predicted answer.')
     parser.add_argument('--num_workers',
                         type=int,

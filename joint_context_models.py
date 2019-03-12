@@ -55,7 +55,7 @@ class JointContextQA(nn.Module):
           Return:
             logits (tensor): logits of (0,1), 0 for no answer, 1 for answerable. (batch_size, 2)
             p_start (tensor): the distribution of the start location. (batch_size, ctx_len)
-            p_end (tensor): the distribution of the end location. (batch_size, q_len)
+            p_end (tensor): the distribution of the end location. (batch_size, ctx_len)
           '''
           ctx_mask = torch.zeros_like(cw_idxs) != cw_idxs #(batch_size, ctx_len)
           q_mask = torch.zeros_like(qw_idxs) != qw_idxs  #(batch_size, ctx_len)
@@ -89,5 +89,26 @@ def compute_loss(ans_logits, p_start, p_end, y1, y2):
     loss = (ans_loss + loc_loss)/batch_size
     return loss
 
+def compute_loss_KL(ans_logits, p_start, p_end, y1, y2, cw_idxs):
+    '''
+      Function:
+      compute the joint loss.
+    ''' 
+    batch_size = ans_logits.size(0)
+    ans_label = (y1 != -1).long() # 0 for no-answer, 1 for has-answer
+    weight = torch.tensor([2., 1.], device=torch.device("cuda")) #punish 0 prediction more to avoid the tendency to predict 1 in which case accounts the location loss
+    ans_loss = F.cross_entropy(ans_logits, ans_label, weight=weight, size_average=False)
+
+    ctx_mask = torch.zeros_like(cw_idxs) != cw_idxs
+    ctx_len = ctx_mask.sum(1).float() #(batch_size,)
+    an_kl = -2.*torch.log(ctx_len + 1e-32) - (ctx_mask.float() * (p_start + p_end)).sum(1)/ctx_len#(batch_size)
+    loss_kl = ((1 - ans_label).float() * an_kl).sum() #just count those instances whose ground truth being no-answer
+
+    start_weight = -1. * ans_label.float() * p_start[:, y1].diag() #only keep element with ans_label = 1
+    end_weight = -1. * ans_label.float() * p_end[:, y2].diag() #only keep element with ans_label = 1
+    loc_loss = ans_loss + start_weight.sum(-1) + end_weight.sum(-1)
+         
+    loss = (ans_loss + loc_loss)/batch_size
+    return loss
 
 
