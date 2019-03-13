@@ -50,14 +50,15 @@ def main(args):
     #word_vectors = util.torch_from_json(args.word_emb_file)
 
     # Get model
+    #pdb.set_trace()
     log.info('Building model...')
     char_vectors = util.torch_from_json("./data/char_emb.json")
-    char_emb_dim = 32
+    char_emb_dim = 16
     bert_hidden_size = 768
     config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=bert_hidden_size,
                                   num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072)
     model = JointContextQA(config, char_emb_dim, char_vectors, drop_prob=0.3, word_emb_dim=bert_hidden_size, 
-                            cat_reduce_factor=1., lstm_dim_bm=128, lstm_dim_pred=128, device=torch.device("cuda"))
+                            cat_reduce_factor=1., lstm_dim_bm=64, lstm_dim_pred=64, device=torch.device("cuda"))
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
         log.info('Loading checkpoint from {}...'.format(args.load_path))
@@ -69,9 +70,12 @@ def main(args):
     param_optimizer = list(model.named_parameters())
     param_optimizer = [n for n in param_optimizer if 'pooler' not in n[0]]
     no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+    not_bert_params = [item for item in param_optimizer if 'bert' not in item[0]]
+    bert_params = [item for item in param_optimizer if 'bert' in item[0]]
     optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        {'params': [p for n, p in not_bert_params], 'lr': args.lr, 'weight_decay': args.l2_wd},
+        {'params': [p for n, p in bert_params if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        {'params': [p for n, p in bert_params if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
         ]
 
     model.train()

@@ -96,7 +96,7 @@ def compute_loss_KL(ans_logits, p_start, p_end, y1, y2, cw_idxs):
     ''' 
     batch_size = ans_logits.size(0)
     ans_label = (y1 != -1).long() # 0 for no-answer, 1 for has-answer
-    weight = torch.tensor([2., 1.], device=torch.device("cuda")) #punish 0 prediction more to avoid the tendency to predict 1 in which case accounts the location loss
+    weight = torch.tensor([1., 1.], device=torch.device("cuda")) #punish 0 prediction more to avoid the tendency to predict 1 in which case accounts the location loss
     ans_loss = F.cross_entropy(ans_logits, ans_label, weight=weight, size_average=False)
 
     ctx_mask = torch.zeros_like(cw_idxs) != cw_idxs
