@@ -3,7 +3,6 @@ from __future__ import absolute_import, division, print_function
 import argparse
 import collections
 import json
-import logging
 import math
 import os
 import random
