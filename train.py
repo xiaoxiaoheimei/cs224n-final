@@ -129,7 +129,7 @@ def main(args):
                 qc_idxs = qc_idxs.to(device)
                 batch_size = cw_idxs.size(0)
                 optimizer.zero_grad()
-                pdb.set_trace()
+                #pdb.set_trace()
 
                 # Forward
                 ans_logits, log_p_start, log_p_end = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)

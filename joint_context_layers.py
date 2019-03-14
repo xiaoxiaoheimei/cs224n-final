@@ -121,17 +121,17 @@ class AnswerablePredictor(nn.Module):
           '''
           ctx = torch.cat((G, M), 2) #(batch_size, ctx_len, self.input_dim)
           att = torch.matmul(ctx, self.att_weight).transpose(1,2) #(batch_size, 1, ctx_len)
-          att = F.dropout(att, p=0.3, training=self.training)
+          att = F.dropout(att, p=self.drop_prob, training=self.training)
           att_prob = util.masked_softmax(att, ctx_mask.unsqueeze(1)) #(batch_size, 1, ctx_len)
           ctx_summary = torch.bmm(att_prob, ctx).squeeze(1) #(batch_size, self.input_dim)
-          ctx_summary = F.dropout(ctx_summary, p=0.3, training=self.training)
+          ctx_summary = F.dropout(ctx_summary, p=self.drop_prob, training=self.training)
           h0 = self.h_proj(ctx_summary) #(batch_size, 2*self.lstm_hdim)
           h0 = h0.view(-1, 2, self.lstm_hdim).transpose(0,1) #(2, batch_size, self.lstm_hdim)
           c0 = self.c_proj(ctx_summary) #(batch_size, 2*self.lstm_hdim)
           c0 = c0.view(-1, 2, self.lstm_hdim).transpose(0,1) #(2, batch_size, self.lstm_hdim)
 
           logits = self.logits_proj(ctx_summary) #(batch_size, 2)
-          logits = F.dropout(logits, p=0.3, training=self.training)
+          logits = F.dropout(logits, p=self.drop_prob, training=self.training)
           h0 = F.dropout(h0, self.drop_prob, self.training).contiguous()
           c0 = F.dropout(c0, self.drop_prob, self.training).contiguous()
           
@@ -177,16 +177,16 @@ class StartLocationPredictor(nn.Module):
           lengths = ctx_mask.sum(-1) #(batch_size)
           M1 = self.rnn(M, lengths, enc_init) #M2: (batch_size, ctx_len, 2*self.lstm_hdim)
           ctx = torch.cat((G, M1), 2) #(batch_size, ctx_len, self.cat_dim)
-          ctx = F.dropout(ctx, p=0.3, training=self.training)
+          ctx = F.dropout(ctx, p=self.drop_prob, training=self.training)
           logits = self.loc_proj(ctx).squeeze(-1) #(batch_size, ctx_len)
-          logits = F.dropout(logits, p=0.3, training=self.training)
+          logits = F.dropout(logits, p=self.drop_prob, training=self.training)
           p_start = util.masked_softmax(logits, ctx_mask, log_softmax=True) #(batch_size, ctx_len)
           
           #use probability as attention explaining the start prediction
           att = p_start.unsqueeze(1) #(batch_size, 1, ctx_len)
           #use attention to obtain a summary of the context in respect to start prediction
           ctx_summary = torch.bmm(att, ctx).squeeze(1) #(batch_size, self.cat_dim)
-          ctx_summary = F.dropout(ctx_summary, p=0.3, training=self.training)
+          ctx_summary = F.dropout(ctx_summary, p=self.drop_prob, training=self.training)
 
           h0 = self.h_proj(ctx_summary) #(batch_size, 2*self.lstm_hdim)
           h0 = h0.view(-1, 2, self.lstm_hdim).transpose(0,1) #(2, batch_size, self.lstm_hdim)
@@ -242,9 +242,9 @@ class EndLocationPredictor(nn.Module):
           c0 = self.h_proj(torch.cat((cA, cs), 2)).contiguous() #(2, batch_size, self.lstm_hdim)
           M2 = self.rnn(M, lengths, (h0, c0)) #(batch_size, ctx_len, 2*lstm_hdim)
           ctx = torch.cat((G, M2), 2) #(batch_size, ctx_len, self.cat_dim)
-          ctx = F.dropout(ctx, p=0.3, training=self.training)
+          ctx = F.dropout(ctx, p=self.drop_prob, training=self.training)
           logits = self.loc_proj(ctx).squeeze(-1) #(batch_size, ctx_len)
-          logits = F.dropout(logits, p=0.3, training=self.training)
+          logits = F.dropout(logits, p=self.drop_prob, training=self.training)
           p_end = util.masked_softmax(logits, ctx_mask, log_softmax=True)#(batch_size, ctx_len)
 
           return p_end

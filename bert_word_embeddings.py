@@ -84,8 +84,13 @@ class BertWordEmbedding(nn.Module):
             segment_ids[i, 2+q_lens[i]:3+q_lens[i]+ctx_lens[i]] = 1
             bert_att[i, 0:3+q_lens[i]+ctx_lens[i]] = 1
 
-            q_restore_mask[0, 0:q_lens[i]] = t.tensor(list(range(1, 1+q_lens[i])), dtype=t.long, device=self.device)
-            ctx_restore_mask[0, 0:ctx_lens[i]] = t.tensor(list(range(2+q_lens[i], 2+q_lens[i]+ctx_lens[i])), dtype=t.long, device=self.device)
+            q_restore_mask[i, 0:q_lens[i]] = t.tensor(list(range(1, 1+q_lens[i])), dtype=t.long, device=self.device)
+            ctx_restore_mask[i, 0:ctx_lens[i]] = t.tensor(list(range(2+q_lens[i], 2+q_lens[i]+ctx_lens[i])), dtype=t.long, device=self.device)
+
+          ###test###
+          assert t.all((t.gather(qa_idx, 1, q_restore_mask) == ques_idxs).long().sum(-1) == q_lens)
+          assert t.all((t.gather(qa_idx, 1, ctx_restore_mask) == ctx_idxs).long().sum(-1) == ctx_lens)
+          #########
 
           return qa_idx, segment_ids, bert_att, q_restore_mask, ctx_restore_mask
 
