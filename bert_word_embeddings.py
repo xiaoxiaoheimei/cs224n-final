@@ -57,6 +57,38 @@ class BertWordEmbedding(nn.Module):
 
           return qa_idxs, segment_ids, bert_att
 
+      def make_bert_compact_input(self, ques_idxs, ctx_idxs, ques_mask, ctx_mask):
+          '''
+          Args:
+           The same as make_bert_input
+          Return:
+           qa_idx, segment_ids, bert_att: same as make_bert_input
+           q_restore_mask: 
+           ctx_restore_mask:
+          '''
+          q_lens = ques_mask.sum(-1) #(batch_size,)
+          ctx_lens = ctx_mask.sum(-1)#(batch_size,)
+          batch_size, q_limits = ques_mask.size()
+          ctx_limits = ctx_mask.size(1)
+          qa_idx = t.zeros((batch_size, ctx_limits + q_limits + 3), dtype=t.long, device=self.device)
+          q_restore_mask = t.zeros_like(ques_mask, dtype=t.long, device=self.device)
+          ctx_restore_mask = t.zeros_like(ctx_mask, dtype=t.long, device=self.device)
+          bert_att = t.zeros((batch_size, ctx_limits + q_limits + 3), dtype=t.long, device=self.device)
+          segment_ids = t.zeros((batch_size, ctx_limits + q_limits + 3), dtype=t.long, device=self.device)
+          for i in range(batch_size):
+            qa_idx[i, 0] = self.CLS # CLS 
+            qa_idx[i, 1:1+q_lens[i]] = ques_idxs[i, 0:q_lens[i]] # CLS <Question> 
+            qa_idx[i, 1+q_lens[i]] = self.SEP # CLS <Question> SEP
+            qa_idx[i, 2+q_lens[i]:2+q_lens[i]+ctx_lens[i]] = ctx_idxs[i, 0:ctx_lens[i]] # CLS <Question> SEP  <Context>
+            qa_idx[i, 2+q_lens[i]+ctx_lens[i]] = self.SEP #CLS <Question> SEP  <Context> SEP
+            segment_ids[i, 2+q_lens[i]:3+q_lens[i]+ctx_lens[i]] = 1
+            bert_att[i, 0:3+q_lens[i]+ctx_lens[i]] = 1
+
+            q_restore_mask[0, 0:q_lens[i]] = t.tensor(list(range(1, 1+q_lens[i])), dtype=t.long, device=self.device)
+            ctx_restore_mask[0, 0:ctx_lens[i]] = t.tensor(list(range(2+q_lens[i], 2+q_lens[i]+ctx_lens[i])), dtype=t.long, device=self.device)
+
+          return qa_idx, segment_ids, bert_att, q_restore_mask, ctx_restore_mask
+
       def parse_context_rep(self, qa_encoder_rep, ctx_len):
           '''
           parse the context from the last layer encoder of the Bert.
@@ -69,6 +101,24 @@ class BertWordEmbedding(nn.Module):
           ctx_rep = qa_encoder_rep[:, -1-ctx_len:-1, :] #skip the last SEP
           return ctx_rep
 
+      def parse_compact_QA_rep(self, qa_encoder_rep, q_restore_mask, ctx_restore_mask):
+          '''
+          parse the context from the last layer encoder of the Bert.
+          Args:
+            @qa_encoder_rep (tensor): last layer encoder of the Bert (batch_size, q_len + ctx_len + 3, bert_hidden_size)
+            @q_restore_mask (tensor): (batch_size, q_len)
+            @ctx_restore_mask (tensor): (batch_size, ctx_len)
+          Return:
+            q_ctx_rep (tensor): contextual repersentation condition on question. (batch_size, q_len, bert_hidden_size)
+            ctx_rep (tensor): contextual repersentation condition on question. (batch_size, ctx_len, bert_hidden_size)
+          '''
+          _, _, bert_hidden_size = qa_encoder_rep.size()
+          q_restore_idx = q_restore_mask.unsqueeze(-1).repeat(1, 1, bert_hidden_size)
+          ctx_restore_idx = ctx_restore_mask.unsqueeze(-1).repeat(1, 1, bert_hidden_size)
+          q_ctx_rep = t.gather(qa_encoder_rep, 1, q_restore_idx)
+          ctx_rep = t.gather(qa_encoder_rep, 1, ctx_restore_idx)
+          return q_ctx_rep, ctx_rep
+
       def forward(self, ques_idxs, ctx_idxs, ques_mask, ctx_mask):
           '''
           Args:
@@ -80,11 +130,11 @@ class BertWordEmbedding(nn.Module):
             bert_ctx_emb (tensor): contextual embedding condition on question. (batch_size, ctx_len, bert_hidden_size)
           '''
           #pdb.set_trace()
-          qa_idxs, segment_ids, bert_att = self.make_bert_input(ques_idxs, ctx_idxs, ques_mask, ctx_mask)
+          qa_idxs, segment_ids, bert_att, q_restore_mask, ctx_restore_mask = self.make_bert_compact_input(ques_idxs, ctx_idxs, ques_mask, ctx_mask)
           #qa_idxs = qa_idxs.cuda()
           #segment_ids = segment_ids.cuda()
           #bert_att = bert_att.cuda()
           ctx_code, _ = self.bert(qa_idxs, segment_ids, bert_att, output_all_encoded_layers=False)
-          bert_ctx_emb = self.parse_context_rep(ctx_code, ctx_idxs.size(1))
+          _, bert_ctx_emb = self.parse_compact_QA_rep(ctx_code, q_restore_mask, ctx_restore_mask)
           return bert_ctx_emb
  

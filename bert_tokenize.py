@@ -4,6 +4,7 @@ import argparse
 import collections
 import json
 import math
+import logging
 import os
 import random
 import sys
@@ -23,6 +24,7 @@ from pytorch_pretrained_bert.tokenization import (BasicTokenizer,
                                                   BertTokenizer,
                                                   whitespace_tokenize)
 import pdb
+from args import get_bert_joint_token_setup_args
 
 if sys.version_info[0] == 2:
     import cPickle as pickle
@@ -414,3 +416,14 @@ def _check_is_max_context(doc_spans, cur_span_index, position):
 
     return cur_span_index == best_span_index
 
+def preprocess(args, tokenizer):
+    pdb.set_trace()
+    examples = read_squad_examples(args.train_file, is_training=True, version_2_with_negative=True)
+    features = convert_examples_to_features(examples=examples, tokenizer=tokenizer, max_seq_length=args.max_seq_length, doc_stride=args.doc_stride, max_query_length=args.max_query_length, is_training=True)
+
+if __name__ == '__main__':
+   args = get_bert_joint_token_setup_args()
+   args.train_file = './data/train-v2.0.json'
+   args.dev_file = './data/dev-v2.0.json'
+   bert_tokenizer= BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+   preprocess(args, bert_tokenizer)

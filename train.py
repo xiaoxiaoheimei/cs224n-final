@@ -25,7 +25,7 @@ from util import collate_fn, SQuAD, BertSQuAD
 
 from pytorch_pretrained_bert import modeling
 from pytorch_pretrained_bert.optimization import BertAdam, warmup_linear
-from joint_context_models import JointContextQA, compute_loss, compute_loss_KL
+from joint_context_models import JointContextQA, compute_loss, compute_loss_KL, compute_loss_KL_v2
 
 import pdb
 
@@ -57,7 +57,7 @@ def main(args):
     bert_hidden_size = 768
     config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=bert_hidden_size,
                                   num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072)
-    model = JointContextQA(config, char_emb_dim, char_vectors, drop_prob=0.3, word_emb_dim=bert_hidden_size, 
+    model = JointContextQA(config, char_emb_dim, char_vectors, drop_prob=0.2, word_emb_dim=bert_hidden_size, 
                             cat_reduce_factor=1., lstm_dim_bm=64, lstm_dim_pred=64, device=torch.device("cuda"))
     model = nn.DataParallel(model, args.gpu_ids)
     if args.load_path:
@@ -73,7 +73,8 @@ def main(args):
     not_bert_params = [item for item in param_optimizer if 'bert' not in item[0]]
     bert_params = [item for item in param_optimizer if 'bert' in item[0]]
     optimizer_grouped_parameters = [
-        {'params': [p for n, p in not_bert_params], 'lr': args.lr, 'weight_decay': args.l2_wd},
+        #{'params': [p for n, p in not_bert_params], 'lr': args.lr, 'weight_decay': args.l2_wd},
+        {'params': [p for n, p in not_bert_params], 'weight_decay': args.l2_wd},
         {'params': [p for n, p in bert_params if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
         {'params': [p for n, p in bert_params if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
         ]
@@ -128,13 +129,13 @@ def main(args):
                 qc_idxs = qc_idxs.to(device)
                 batch_size = cw_idxs.size(0)
                 optimizer.zero_grad()
-                #pdb.set_trace()
+                pdb.set_trace()
 
                 # Forward
                 ans_logits, log_p_start, log_p_end = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
                 #print("log_p1.requires_grad:{}, log_p2:{}".format(log_p1.requires_grad, log_p2.requires_grad))
                 y1, y2 = y1.to(device), y2.to(device)
-                loss = compute_loss_KL(ans_logits, log_p_start, log_p_end, y1, y2, cw_idxs)
+                loss = compute_loss_KL_v2(ans_logits, log_p_start, log_p_end, y1, y2, cw_idxs)
                 loss_val = loss.item()
 
                 # Backward
@@ -206,7 +207,7 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             # Forward
             ans_logits, log_p_start, log_p_end = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
             y1, y2 = y1.to(device), y2.to(device)
-            loss = compute_loss_KL(ans_logits, log_p_start, log_p_end, y1, y2, cw_idxs)
+            loss = compute_loss_KL_v2(ans_logits, log_p_start, log_p_end, y1, y2, cw_idxs)
             nll_meter.update(loss.item(), batch_size)
 
             # Get F1 and EM scores

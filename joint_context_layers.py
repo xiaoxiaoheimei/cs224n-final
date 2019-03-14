@@ -130,7 +130,7 @@ class AnswerablePredictor(nn.Module):
           c0 = self.c_proj(ctx_summary) #(batch_size, 2*self.lstm_hdim)
           c0 = c0.view(-1, 2, self.lstm_hdim).transpose(0,1) #(2, batch_size, self.lstm_hdim)
 
-          logits = self.logits_proj(ctx_summary) #(batch_size, self.lstm_hdim)
+          logits = self.logits_proj(ctx_summary) #(batch_size, 2)
           logits = F.dropout(logits, p=0.3, training=self.training)
           h0 = F.dropout(h0, self.drop_prob, self.training).contiguous()
           c0 = F.dropout(c0, self.drop_prob, self.training).contiguous()

@@ -111,4 +111,28 @@ def compute_loss_KL(ans_logits, p_start, p_end, y1, y2, cw_idxs):
     loss = (ans_loss + loc_loss)/batch_size
     return loss
 
+def compute_loss_KL_v2(ans_logits, p_start, p_end, y1, y2, cw_idxs):
+    '''
+      Function:
+      compute the joint loss.
+    ''' 
+    batch_size = ans_logits.size(0)
+    ans_label = (y1 != -1).long() # 0 for no-answer, 1 for has-answer
+    weight = torch.tensor([1., 1.], device=torch.device("cuda")) #punish 0 prediction more to avoid the tendency to predict 1 in which case accounts the location loss
+    ans_loss = F.cross_entropy(ans_logits, ans_label, weight=weight, size_average=False)
+
+    ans_pred = (ans_logits[:,1] > ans_logits[:,0]).long() #prediction
+    no_ans_miss = ((ans_label - ans_pred) == -1).float() #extract the no-answer prediction mistakes
+
+    ctx_mask = torch.zeros_like(cw_idxs) != cw_idxs
+    ctx_len = ctx_mask.sum(1).float() #(batch_size,)
+    an_kl = -2.*torch.log(ctx_len + 1e-32) - (ctx_mask.float() * (p_start + p_end)).sum(1)/ctx_len#(batch_size)
+    loss_kl = (no_ans_miss * an_kl).sum() #just count those instances whose ground truth being no-answer but predicted as has-answer
+
+    start_weight = -1. * ans_label.float() * p_start[:, y1].diag() #only keep element with ans_label = 1
+    end_weight = -1. * ans_label.float() * p_end[:, y2].diag() #only keep element with ans_label = 1
+    loc_loss = ans_loss + start_weight.sum(-1) + end_weight.sum(-1)
+         
+    loss = (ans_loss + loc_loss)/batch_size
+    return loss
 

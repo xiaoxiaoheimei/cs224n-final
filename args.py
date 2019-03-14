@@ -119,6 +119,101 @@ def get_setup_args():
 
     return args
 
+def get_bert_joint_token_setup_args():
+    """Get arguments needed in setup.py."""
+    parser = argparse.ArgumentParser('Download and pre-process SQuAD')
+
+
+    parser.add_argument('--dev_meta_file',
+                        type=str,
+                        default='./data/dev_meta_bert_joint.json')
+    parser.add_argument('--test_meta_file',
+                        type=str,
+                        default='./data/test_meta_bert_joint.json')
+    parser.add_argument('--word2idx_file',
+                        type=str,
+                        default='./data/word2idx_bert_joint.json')
+    parser.add_argument('--char2idx_file',
+                        type=str,
+                        default='./data/char2idx_bert_joint.json')
+    parser.add_argument('--answer_file',
+                        type=str,
+                        default='./data/answer_bert_joint.json')
+    parser.add_argument('--max_seq_length',
+                        type=int,
+                        default=384,
+                        help='Max number of words in a paragraph')
+    parser.add_argument('--max_query_length',
+                        type=int,
+                        default=64,
+                        help='Max number of words to keep from a question')
+    parser.add_argument('--doc_stride',
+                        type=int,
+                        default=128,
+                        help='Segment length of a long paragraph')
+    parser.add_argument('--test_para_limit',
+                        type=int,
+                        default=1000,
+                        help='Max number of words in a paragraph at test time')
+    parser.add_argument('--test_ques_limit',
+                        type=int,
+                        default=100,
+                        help='Max number of words in a question at test time')
+    parser.add_argument('--char_dim',
+                        type=int,
+                        default=64,
+                        help='Size of char vectors (char-level embeddings)')
+    parser.add_argument('--max_answer_length',
+                        type=int,
+                        default=30,
+                        help='Max number of words in a training example answer')
+    parser.add_argument('--char_limit',
+                        type=int,
+                        default=16,
+                        help='Max number of chars to keep from a word')
+    parser.add_argument('--include_test_examples',
+                        type=lambda s: s.lower().startswith('t'),
+                        default=True,
+                        help='Process examples from the test set')
+    parser.add_argument('--train_bert_joint_record_file',
+                        type=str,
+                        default='./data/bert_joint_train.npz',
+                        help='Bert tokenized training set.')
+    parser.add_argument('--dev_bert_joint_record_file',
+                        type=str,
+                        default='./data/bert_joint_dev.npz',
+                        help='Bert tokenized dev set.')
+    parser.add_argument('--test_bert_record_joint_file',
+                        type=str,
+                        default='./data/bert_joint_test.npz',
+                        help='Bert tokenized test set.')
+    parser.add_argument('--train_bert_joint_eval_file',
+                        type=str,
+                        default='./data/train_bert_joint_eval.json')
+    parser.add_argument('--dev_bert_joint_eval_file',
+                        type=str,
+                        default='./data/dev_bert_joint_eval.json')
+    parser.add_argument('--test_bert_joint_eval_file',
+                        type=str,
+                        default='./data/test_bert_joint_eval.json')
+    parser.add_argument('--test_bert_joint_meta_file',
+                        type=str,
+                        default='./data/test_bert_joint_meta.json')
+    parser.add_argument('--char_bert_joint_emb_file',
+                        type=str,
+                        default='./data/char_bert_joint_emb.json')
+    parser.add_argument('--char2idx_bert_joint_file',
+                        type=str,
+                        default='./data/bert_joint_char2idx.json')
+    parser.add_argument('--dev_bert_joint_meta_file',
+                        type=str,
+                        default='./data/dev_bert_joint_meta.json')
+
+
+    args = parser.parse_args()
+
+    return args
+
 
 def get_train_args():
     """Get arguments needed in train.py."""
@@ -133,7 +228,7 @@ def get_train_args():
                         help='Number of steps between successive evaluations.')
     parser.add_argument('--lr',
                         type=float,
-                        default=0.001,
+                        default=0.0001,
                         help='Learning rate.')
     parser.add_argument('--l2_wd',
                         type=float,
