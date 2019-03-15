@@ -52,7 +52,7 @@ def main(args):
     # Get model
     #pdb.set_trace()
     log.info('Building model...')
-    char_vectors = util.torch_from_json("./data/char_emb.json")
+    char_vectors = util.torch_from_json("./data/char_bert_emb.json")
     char_emb_dim = 16
     bert_hidden_size = 768
     config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=bert_hidden_size,

@@ -42,7 +42,7 @@ def main(args):
 
     # Get model
     log.info('Building model...')
-    char_vectors = util.torch_from_json("./data/char_emb.json")
+    char_vectors = util.torch_from_json("./data/char_bert_emb.json")
     char_emb_dim = 16
     bert_hidden_size = 768
     config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=bert_hidden_size,
@@ -82,6 +82,7 @@ def main(args):
             cc_idxs = cc_idxs.to(device)
             qc_idxs = qc_idxs.to(device)
             batch_size = cw_idxs.size(0)
+            print(cw_idxs.size())
 
             # Forward
             ans_logits, log_p_start, log_p_end = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
