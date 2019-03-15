@@ -29,7 +29,7 @@ from ujson import load as json_load
 from util import collate_fn, SQuAD, BertSQuAD
 
 from pytorch_pretrained_bert import modeling
-from joint_context_models import JointContextQA, compute_loss
+from joint_context_models import JointContextQA, compute_loss, compute_loss_KL_v2
 
 
 def main(args):
@@ -43,12 +43,12 @@ def main(args):
     # Get model
     log.info('Building model...')
     char_vectors = util.torch_from_json("./data/char_emb.json")
-    char_emb_dim = 32
+    char_emb_dim = 16
     bert_hidden_size = 768
     config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=bert_hidden_size,
                                   num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072)
-    model = JointContextQA(config, char_emb_dim, char_vectors, drop_prob=0.3, word_emb_dim=bert_hidden_size,
-                            cat_reduce_factor=0.5, lstm_dim_bm=128, lstm_dim_pred=128, device=torch.device("cuda"))
+    model = JointContextQA(config, char_emb_dim, char_vectors, drop_prob=0.2, word_emb_dim=bert_hidden_size,
+                            cat_reduce_factor=1, lstm_dim_bm=64, lstm_dim_pred=64, device=torch.device("cuda"))
     model = nn.DataParallel(model, gpu_ids)
     log.info('Loading checkpoint from {}...'.format(args.load_path))
     model = util.load_model(model, args.load_path, gpu_ids, return_step=False)
@@ -86,7 +86,7 @@ def main(args):
             # Forward
             ans_logits, log_p_start, log_p_end = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
             y1, y2 = y1.to(device), y2.to(device)
-            loss = compute_loss(ans_logits, log_p_start, log_p_end, y1, y2)
+            loss = compute_loss_KL_v2(ans_logits, log_p_start, log_p_end, y1, y2, cw_idxs)
             nll_meter.update(loss.item(), batch_size)
 
             # Get F1 and EM scores
