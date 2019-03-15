@@ -82,7 +82,6 @@ def main(args):
             cc_idxs = cc_idxs.to(device)
             qc_idxs = qc_idxs.to(device)
             batch_size = cw_idxs.size(0)
-            print(cw_idxs.size())
 
             # Forward
             ans_logits, log_p_start, log_p_end = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)

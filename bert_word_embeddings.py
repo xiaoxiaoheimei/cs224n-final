@@ -70,6 +70,7 @@ class BertWordEmbedding(nn.Module):
           ctx_lens = ctx_mask.sum(-1)#(batch_size,)
           batch_size, q_limits = ques_mask.size()
           ctx_limits = ctx_mask.size(1)
+          print(q_limits, ctx_limits)
           qa_idx = t.zeros((batch_size, ctx_limits + q_limits + 3), dtype=t.long, device=self.device)
           q_restore_mask = t.zeros_like(ques_mask, dtype=t.long, device=self.device)
           ctx_restore_mask = t.zeros_like(ctx_mask, dtype=t.long, device=self.device)
@@ -141,5 +142,6 @@ class BertWordEmbedding(nn.Module):
           #bert_att = bert_att.cuda()
           ctx_code, _ = self.bert(qa_idxs, segment_ids, bert_att, output_all_encoded_layers=False)
           _, bert_ctx_emb = self.parse_compact_QA_rep(ctx_code, q_restore_mask, ctx_restore_mask)
+          print(ctx_code.size())
           return bert_ctx_emb
  

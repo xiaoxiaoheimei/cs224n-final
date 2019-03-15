@@ -325,6 +325,8 @@ def build_features(args, examples, bert_tokenizer, data_type, out_file, char2idx
     ans_limit = args.ans_limit
     char_limit = args.char_limit
 
+    print("param_limit:{}, ques_limit:{}".format(para_limit, ques_limit))
+
     def drop_example(ex, is_test_=False):
         if is_test_:
             drop = False
@@ -361,16 +363,24 @@ def build_features(args, examples, bert_tokenizer, data_type, out_file, char2idx
             return 1
 
         context_idx = np.array(bert_tokenizer.convert_tokens_to_ids(example["context_tokens"]), dtype=np.int32)
-        context_idx = np.pad(context_idx, (0, para_limit - len(context_idx)), 'constant', constant_values=0)
+        if para_limit > len(context_idx):
+          context_idx = np.pad(context_idx, (0, para_limit - len(context_idx)), 'constant', constant_values=0)
+        else:
+          context_idx = context_idx[0:para_limit] # can step in here when do tokenize for test set
         context_char_idx = np.zeros([para_limit, char_limit], dtype=np.int32)
         ques_idx = np.array(bert_tokenizer.convert_tokens_to_ids(example["ques_tokens"]), dtype=np.int32)
-        ques_idx = np.pad(ques_idx, (0, ques_limit - len(ques_idx)), 'constant', constant_values=0)
+        if ques_limit > len(ques_idx):
+          ques_idx = np.pad(ques_idx, (0, ques_limit - len(ques_idx)), 'constant', constant_values=0)
+        else:
+          ques_idx = ques_idx[0:ques_limit]
         ques_char_idx = np.zeros([ques_limit, char_limit], dtype=np.int32)
 
         context_idxs.append(context_idx)
         ques_idxs.append(ques_idx)
 
         for i, token in enumerate(example["context_chars"]):
+            if i == para_limit: 
+               break #happen when do tokenize for test set
             for j, char in enumerate(token):
                 if j == char_limit:
                     break
@@ -378,6 +388,8 @@ def build_features(args, examples, bert_tokenizer, data_type, out_file, char2idx
         context_char_idxs.append(context_char_idx)
 
         for i, token in enumerate(example["ques_chars"]):
+            if i == ques_limit:
+               break
             for j, char in enumerate(token):
                 if j == char_limit:
                     break

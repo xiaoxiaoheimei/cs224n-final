@@ -42,19 +42,19 @@ def get_setup_args():
                         default='./data/answer.json')
     parser.add_argument('--para_limit',
                         type=int,
-                        default=384,
+                        default=328,
                         help='Max number of words in a paragraph')
     parser.add_argument('--ques_limit',
                         type=int,
-                        default=64,
+                        default=53,
                         help='Max number of words to keep from a question')
     parser.add_argument('--test_para_limit',
                         type=int,
-                        default=1000,
+                        default=469,
                         help='Max number of words in a paragraph at test time')
     parser.add_argument('--test_ques_limit',
                         type=int,
-                        default=100,
+                        default=40,
                         help='Max number of words in a question at test time')
     parser.add_argument('--char_dim',
                         type=int,
@@ -153,11 +153,11 @@ def get_bert_joint_token_setup_args():
                         help='Segment length of a long paragraph')
     parser.add_argument('--test_para_limit',
                         type=int,
-                        default=1000,
+                        default=469,
                         help='Max number of words in a paragraph at test time')
     parser.add_argument('--test_ques_limit',
                         type=int,
-                        default=100,
+                        default=40,
                         help='Max number of words in a question at test time')
     parser.add_argument('--char_dim',
                         type=int,
