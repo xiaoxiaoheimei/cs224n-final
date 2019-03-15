@@ -42,11 +42,11 @@ def get_setup_args():
                         default='./data/answer.json')
     parser.add_argument('--para_limit',
                         type=int,
-                        default=328,
+                        default=469,
                         help='Max number of words in a paragraph')
     parser.add_argument('--ques_limit',
                         type=int,
-                        default=53,
+                        default=40,
                         help='Max number of words to keep from a question')
     parser.add_argument('--test_para_limit',
                         type=int,
